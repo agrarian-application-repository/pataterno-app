@@ -17,7 +17,10 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+
+from dashboard import render_dashboard
 
 APP_NAME = "pataterno-demo-app"
 APP_VERSION = "1.0.0"
@@ -114,6 +117,12 @@ async def detections(min_confidence: float = 0.0):
         raise HTTPException(status_code=422, detail="min_confidence must be in [0, 1]")
     hits = [d for d in DETECTIONS if d["confidence"] >= min_confidence]
     return {"count": len(hits), "detections": hits}
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard():
+    """Read-only farmer dashboard (mock data) — the MS3 dashboard preview."""
+    return render_dashboard(DETECTIONS)
 
 
 if __name__ == "__main__":

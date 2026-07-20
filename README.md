@@ -22,6 +22,7 @@ This demo exercises the full AGRARIAN application pipeline described in the Deve
 | POST | `/readings` | Ingest a soil reading (validated) |
 | GET | `/readings/latest` | Latest reading per station |
 | GET | `/detections?min_confidence=0.9` | CPB detections above a confidence threshold |
+| GET | `/dashboard` | Farmer dashboard (mock, Italian UI) — station grid, moisture trend, CPB alerts, treatment advice. Preview of the MS3 dashboard. |
 
 ## Run locally
 

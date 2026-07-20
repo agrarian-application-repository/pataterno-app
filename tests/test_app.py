@@ -80,6 +80,17 @@ def test_ingest_rejects_out_of_range_ph():
     assert r.status_code == 422
 
 
+def test_dashboard():
+    r = client.get("/dashboard")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/html")
+    body = r.text
+    assert "PATATERNO" in body
+    assert "Umidità media suolo" in body
+    assert "Allerta dorifora" in body
+    assert "<svg" in body  # moisture chart present
+
+
 def test_detections_filter():
     r = client.get("/detections", params={"min_confidence": 0.95})
     assert r.status_code == 200
