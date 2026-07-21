@@ -3,8 +3,8 @@ Farmer dashboard (mock) for pataterno-demo-app.
 
 Read-only view of the PATATERNO field for the farmer at Petrizzo:
 station grid, soil-moisture trend, CPB alerts and treatment advice.
-All data is mocked in this demo; the production version reads the
-AGRARIAN PostgreSQL. Italian UI — the end user is the local farmer.
+Bilingual (Italian default, English toggle). All data is mocked in
+this demo; the production version reads the AGRARIAN PostgreSQL.
 """
 
 # 24 hourly soil-moisture values (%) — field-realistic mock (dawn peak,
@@ -27,6 +27,81 @@ STATIONS = [
     {"id": "station-08", "moisture": 41.6, "temp": 22.7, "status": "ok"},
     {"id": "station-09", "moisture": 39.8, "temp": 23.0, "status": "ok"},
 ]
+
+# UI strings — Italian default, English toggle (client-side)
+I18N = {
+    "it": {
+        "title": "PATATERNO · Cruscotto campo — Petrizzo",
+        "farm": "Azienda Petrizzo — campo patate",
+        "demo": "DEMO · DATI SIMULATI",
+        "updated": "agg. 21 luglio 2026 · 07:40",
+        "stations_active": "Stazioni attive",
+        "all_online": "✓ tutte online",
+        "avg_moisture": "Umidità media suolo",
+        "target_range": "obiettivo 35–45%",
+        "soil_temp": "Temperatura suolo",
+        "avg_of_9": "media delle 9 stazioni",
+        "cpb_alert": "Allerta dorifora",
+        "to_verify": "⚠ rilevamenti da verificare",
+        "chart_title": "Umidità del suolo — ultime 24 ore (media campo)",
+        "grid_title": "Griglia stazioni 3×3 — umidità per stazione",
+        "st_ok": "✓ regolare",
+        "st_low": "⚠ umidità bassa",
+        "alerts_title": "Allerte dorifora (volo drone)",
+        "cpb_detected": "Dorifora rilevata",
+        "confidence": "confidenza",
+        "advice_title": "Consiglio operativo",
+        "window_label": "Finestra di trattamento:",
+        "window_text": "domani 06:00–09:00 — vento previsto < 8 km/h, nessuna pioggia nelle 24 h successive.",
+        "inspect_text": "Ispezionare la zona ST-03: umidità sotto soglia (31%). Verificare irrigazione settore nord-est.",
+        "table_title": "Ultime letture per stazione (vista tabellare)",
+        "th_station": "Stazione",
+        "th_moisture": "Umidità %",
+        "th_temp": "Temp °C",
+        "th_status": "Stato",
+        "row_ok": "regolare",
+        "row_low": "umidità bassa",
+        "chart_aria": "Umidità del suolo, ultime 24 ore",
+    },
+    "en": {
+        "title": "PATATERNO · Field dashboard — Petrizzo",
+        "farm": "Petrizzo farm — potato field",
+        "demo": "DEMO · MOCK DATA",
+        "updated": "updated 21 July 2026 · 07:40",
+        "stations_active": "Active stations",
+        "all_online": "✓ all online",
+        "avg_moisture": "Avg soil moisture",
+        "target_range": "target 35–45%",
+        "soil_temp": "Soil temperature",
+        "avg_of_9": "average of the 9 stations",
+        "cpb_alert": "CPB alert",
+        "to_verify": "⚠ detections to verify",
+        "chart_title": "Soil moisture — last 24 hours (field average)",
+        "grid_title": "3×3 station grid — moisture per station",
+        "st_ok": "✓ normal",
+        "st_low": "⚠ low moisture",
+        "alerts_title": "CPB alerts (drone flight)",
+        "cpb_detected": "Colorado beetle detected",
+        "confidence": "confidence",
+        "advice_title": "Operational advice",
+        "window_label": "Treatment window:",
+        "window_text": "tomorrow 06:00–09:00 — forecast wind < 8 km/h, no rain in the following 24 h.",
+        "inspect_text": "Inspect area ST-03: moisture below threshold (31%). Check irrigation in the north-east sector.",
+        "table_title": "Latest readings per station (table view)",
+        "th_station": "Station",
+        "th_moisture": "Moisture %",
+        "th_temp": "Temp °C",
+        "th_status": "Status",
+        "row_ok": "normal",
+        "row_low": "low moisture",
+        "chart_aria": "Soil moisture, last 24 hours",
+    },
+}
+
+
+def _t(key: str) -> str:
+    """Italian default text plus the data-i18n hook for the JS toggle."""
+    return f'<span data-i18n="{key}">{I18N["it"][key]}</span>'
 
 
 def _moisture_chart_svg() -> str:
@@ -62,7 +137,7 @@ def _moisture_chart_svg() -> str:
     )
     last = MOISTURE_24H[-1]
     return f"""
-<svg viewBox="0 0 {w} {h}" role="img" aria-label="Umidita del suolo, ultime 24 ore">
+<svg viewBox="0 0 {w} {h}" role="img" aria-label="{I18N['it']['chart_aria']}">
   {grid}{hours}
   <line x1="{pad_l}" y1="{h - pad_b}" x2="{w - pad_r}" y2="{h - pad_b}" class="axis"/>
   <polyline points="{pts}" class="series"/>
@@ -74,16 +149,17 @@ def _moisture_chart_svg() -> str:
 
 
 def render_dashboard(detections: list[dict]) -> str:
+    import json
+
     n_online = len(STATIONS)
     avg_m = sum(s["moisture"] for s in STATIONS) / n_online
     avg_t = sum(s["temp"] for s in STATIONS) / n_online
-    low = [s for s in STATIONS if s["status"] == "low"]
 
     cells = "".join(
         f"""<div class="cell {s['status']}">
   <div class="cell-id">{s['id'].replace('station-', 'ST-')}</div>
   <div class="cell-val">{s['moisture']:.0f}%</div>
-  <div class="cell-status">{'⚠ umidità bassa' if s['status'] == 'low' else '✓ regolare'}</div>
+  <div class="cell-status">{_t('st_low') if s['status'] == 'low' else _t('st_ok')}</div>
 </div>"""
         for s in STATIONS
     )
@@ -91,7 +167,7 @@ def render_dashboard(detections: list[dict]) -> str:
     det_rows = "".join(
         f"""<li>
   <span class="det-badge">🪲</span>
-  <div><strong>Dorifora rilevata</strong> — confidenza {d['confidence'] * 100:.0f}%
+  <div><strong>{_t('cpb_detected')}</strong> — {_t('confidence')} {d['confidence'] * 100:.0f}%
   <div class="det-meta">{d['captured_at'].replace('T', ' · ').replace('Z', ' UTC')} · {d['lat']}N {d['lon']}E · {d['frame']}</div></div>
 </li>"""
         for d in detections
@@ -99,7 +175,7 @@ def render_dashboard(detections: list[dict]) -> str:
 
     table_rows = "".join(
         f"<tr><td>{s['id']}</td><td>{s['moisture']:.1f}</td><td>{s['temp']:.1f}</td>"
-        f"<td>{'umidità bassa' if s['status'] == 'low' else 'regolare'}</td></tr>"
+        f"<td>{_t('row_low') if s['status'] == 'low' else _t('row_ok')}</td></tr>"
         for s in STATIONS
     )
 
@@ -108,7 +184,7 @@ def render_dashboard(detections: list[dict]) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PATATERNO · Cruscotto campo — Petrizzo</title>
+<title>{I18N['it']['title']}</title>
 <style>
   :root {{
     color-scheme: light;
@@ -132,10 +208,15 @@ def render_dashboard(detections: list[dict]) -> str:
     font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 20px; }}
   .wrap {{ max-width: 980px; margin: 0 auto; display: grid; gap: 14px; }}
   header {{ display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }}
-  header h1 {{ font-size: 20px; }} header h1 span {{ color: var(--brand); }}
+  header h1 {{ font-size: 20px; }} header h1 span.brand {{ color: var(--brand); }}
   .demo-tag {{ font-size: 11px; letter-spacing: .06em; border: 1px solid var(--border);
     border-radius: 99px; padding: 2px 10px; color: var(--ink-2); }}
-  header .when {{ margin-left: auto; color: var(--muted); font-size: 13px; }}
+  header .right {{ margin-left: auto; display: flex; gap: 10px; align-items: center; }}
+  header .when {{ color: var(--muted); font-size: 13px; }}
+  .lang {{ display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }}
+  .lang button {{ border: 0; background: transparent; color: var(--ink-2); font: 600 12px/1 inherit;
+    font-family: inherit; padding: 6px 10px; cursor: pointer; }}
+  .lang button.active {{ background: var(--brand); color: #fff; }}
   .card {{ background: var(--surface); border: 1px solid var(--border);
     border-radius: 10px; padding: 14px 16px; }}
   .card h2 {{ font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 10px; }}
@@ -184,63 +265,67 @@ def render_dashboard(detections: list[dict]) -> str:
 <body>
 <div class="wrap">
   <header>
-    <h1><span>PATATERNO</span> · Azienda Petrizzo — campo patate</h1>
-    <span class="demo-tag">DEMO · DATI SIMULATI</span>
-    <span class="when">agg. 21 luglio 2026 · 07:40</span>
+    <h1><span class="brand">PATATERNO</span> · {_t('farm')}</h1>
+    <span class="demo-tag">{_t('demo')}</span>
+    <span class="right">
+      <span class="when">{_t('updated')}</span>
+      <span class="lang" role="group" aria-label="Lingua / Language">
+        <button id="btn-it" class="active" onclick="setLang('it')">IT</button>
+        <button id="btn-en" onclick="setLang('en')">EN</button>
+      </span>
+    </span>
   </header>
 
   <div class="tiles">
     <div class="card tile">
-      <div class="label">Stazioni attive</div>
+      <div class="label">{_t('stations_active')}</div>
       <div class="value">{n_online} / 9</div>
-      <div class="status-line good">✓ tutte online</div>
+      <div class="status-line good">{_t('all_online')}</div>
     </div>
     <div class="card tile">
-      <div class="label">Umidità media suolo</div>
+      <div class="label">{_t('avg_moisture')}</div>
       <div class="value">{avg_m:.1f}%</div>
-      <div class="sub">obiettivo 35–45%</div>
+      <div class="sub">{_t('target_range')}</div>
     </div>
     <div class="card tile">
-      <div class="label">Temperatura suolo</div>
+      <div class="label">{_t('soil_temp')}</div>
       <div class="value">{avg_t:.1f}°C</div>
-      <div class="sub">media delle 9 stazioni</div>
+      <div class="sub">{_t('avg_of_9')}</div>
     </div>
     <div class="card tile">
-      <div class="label">Allerta dorifora</div>
+      <div class="label">{_t('cpb_alert')}</div>
       <div class="value">{len(detections)}</div>
-      <div class="status-line warn">⚠ rilevamenti da verificare</div>
+      <div class="status-line warn">{_t('to_verify')}</div>
     </div>
   </div>
 
   <div class="card">
-    <h2>Umidità del suolo — ultime 24 ore (media campo)</h2>
+    <h2>{_t('chart_title')}</h2>
     {_moisture_chart_svg()}
   </div>
 
   <div class="cols">
     <div class="card">
-      <h2>Griglia stazioni 3×3 — umidità per stazione</h2>
+      <h2>{_t('grid_title')}</h2>
       <div class="grid3">{cells}</div>
     </div>
     <div style="display:grid; gap:14px; align-content:start;">
       <div class="card">
-        <h2>Allerte dorifora (volo drone)</h2>
+        <h2>{_t('alerts_title')}</h2>
         <ul class="dets">{det_rows}</ul>
       </div>
       <div class="card advice">
-        <h2>Consiglio operativo</h2>
-        <p><strong>Finestra di trattamento:</strong> domani 06:00–09:00 —
-        vento previsto &lt; 8 km/h, nessuna pioggia nelle 24 h successive.</p>
-        <p class="det-meta" style="margin-top:6px">Ispezionare la zona ST-03:
-        umidità sotto soglia (31%). Verificare irrigazione settore nord-est.</p>
+        <h2>{_t('advice_title')}</h2>
+        <p><strong>{_t('window_label')}</strong> {_t('window_text')}</p>
+        <p class="det-meta" style="margin-top:6px">{_t('inspect_text')}</p>
       </div>
     </div>
   </div>
 
   <div class="card">
-    <h2>Ultime letture per stazione (vista tabellare)</h2>
+    <h2>{_t('table_title')}</h2>
     <table>
-      <thead><tr><th>Stazione</th><th>Umidità %</th><th>Temp °C</th><th>Stato</th></tr></thead>
+      <thead><tr><th>{_t('th_station')}</th><th>{_t('th_moisture')}</th><th>{_t('th_temp')}</th><th>{_t('th_status')}</th></tr></thead>
       <tbody>{table_rows}</tbody>
     </table>
   </div>
@@ -249,6 +334,17 @@ def render_dashboard(detections: list[dict]) -> str:
 </div>
 <div id="tip"></div>
 <script>
+  const I18N = {json.dumps(I18N, ensure_ascii=False)};
+  function setLang(lang) {{
+    document.documentElement.lang = lang;
+    document.title = I18N[lang].title;
+    document.querySelectorAll('[data-i18n]').forEach(el => {{
+      const s = I18N[lang][el.dataset.i18n];
+      if (s !== undefined) el.textContent = s;
+    }});
+    document.getElementById('btn-it').classList.toggle('active', lang === 'it');
+    document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  }}
   const tip = document.getElementById('tip');
   const xh = document.getElementById('xh');
   document.querySelectorAll('.hit').forEach(c => {{

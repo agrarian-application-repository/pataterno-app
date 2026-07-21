@@ -86,9 +86,12 @@ def test_dashboard():
     assert r.headers["content-type"].startswith("text/html")
     body = r.text
     assert "PATATERNO" in body
-    assert "Umidità media suolo" in body
-    assert "Allerta dorifora" in body
     assert "<svg" in body  # moisture chart present
+    # bilingual: Italian rendered by default, English in the toggle dictionary
+    assert "Umidità media suolo" in body
+    assert "Avg soil moisture" in body
+    assert 'data-i18n="avg_moisture"' in body
+    assert 'id="btn-en"' in body
 
 
 def test_detections_filter():
