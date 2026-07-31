@@ -1,4 +1,4 @@
-# pataterno-demo-app - AGRARIAN Project
+# pataterno-app - AGRARIAN Project
 
 Demo application for the **PATATERNO** project (Precision Agriculture for poTAto pesT Early Recognition with NOn-terrestrial communications). It exposes a minimal version of the PATATERNO container API for the AGRARIAN portal: soil-telemetry ingestion, latest-values query and Colorado-potato-beetle (CPB) detection summary. The application is designed for **Testbed 2 (DLR)** and the potato pest early-recognition use case. It was developed by **Buontech Solutions srl**.
 
@@ -35,6 +35,6 @@ python -m pytest tests/ -v   # run the test suite
 ## Run the container
 
 ```bash
-docker run -p 8080:80 ghcr.io/<owner>/pataterno-demo-app:latest
+docker run -p 8080:80 ghcr.io/<owner>/pataterno-app:latest
 curl http://localhost:8080/health
 ```

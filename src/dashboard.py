@@ -1,5 +1,5 @@
 """
-Farmer dashboard (mock) for pataterno-demo-app.
+Farmer dashboard (mock) for pataterno-app.
 
 Read-only view of the PATATERNO field for the farmer at Petrizzo:
 station grid, soil-moisture trend, CPB alerts and treatment advice.

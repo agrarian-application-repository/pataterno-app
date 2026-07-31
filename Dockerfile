@@ -1,5 +1,5 @@
 # ------------------------------------------------------------
-# pataterno-demo-app — AGRARIAN Project
+# pataterno-app — AGRARIAN Project
 # Based on the AGRARIAN Dockerfile template (Python variant).
 # ------------------------------------------------------------
 

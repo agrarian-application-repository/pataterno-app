@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-pataterno-demo-app - AGRARIAN Project (Open Call 2, Testbed 2)
+pataterno-app - AGRARIAN Project (Open Call 2, Testbed 2)
 
 Demo application for the PATATERNO project (Precision Agriculture for
 poTAto pesT Early Recognition with NOn-terrestrial communications).
@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 
 from dashboard import render_dashboard
 
-APP_NAME = "pataterno-demo-app"
+APP_NAME = "pataterno-app"
 APP_VERSION = "1.0.0"
 
 app = FastAPI(title=APP_NAME, version=APP_VERSION)

@@ -1,4 +1,4 @@
-"""Tests for pataterno-demo-app — run by the CI 'test' job."""
+"""Tests for pataterno-app — run by the CI 'test' job."""
 
 import sys
 from pathlib import Path
@@ -16,7 +16,7 @@ def test_home():
     r = client.get("/")
     assert r.status_code == 200
     body = r.json()
-    assert body["name"] == "pataterno-demo-app"
+    assert body["name"] == "pataterno-app"
     assert body["status"] == "running"
 
 
