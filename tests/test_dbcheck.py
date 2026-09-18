@@ -220,3 +220,46 @@ def test_iso_z_emits_a_literal_z_not_an_offset():
     # .replace('Z', ' UTC') silently fails to match.
     value = datetime(2026, 6, 17, 10, 41, tzinfo=timezone.utc)
     assert db.iso_z(value) == "2026-06-17T10:41:00Z"
+
+
+def test_startup_write_is_skipped_when_auth_failed(monkeypatch):
+    """The startup row is the out-of-band channel; it must not be attempted
+    when there is nothing to write with, and must never raise."""
+    import asyncio
+
+    import app as app_mod
+
+    monkeypatch.setattr(
+        app_mod.db, "run_dbcheck",
+        lambda *a, **k: {"verdict": "no_route", "auth": {"ok": False},
+                         "container": {"egress_ip": None}},
+    )
+
+    def _boom(*a, **k):
+        raise AssertionError("write_ping must not be called without auth")
+
+    monkeypatch.setattr(app_mod.db, "write_ping", _boom)
+    asyncio.run(app_mod._startup_dbcheck())  # must not raise
+
+
+def test_startup_write_records_the_verdict(monkeypatch):
+    import asyncio
+
+    import app as app_mod
+
+    monkeypatch.setattr(
+        app_mod.db, "run_dbcheck",
+        lambda *a, **k: {"verdict": "db_ok", "auth": {"ok": True},
+                         "container": {"egress_ip": "10.5.6.40"}},
+    )
+    captured = {}
+
+    def _write(note):
+        captured["note"] = note
+        return {"ping_id": 7, "pinged_at": "2026-09-18T12:00:00Z"}
+
+    monkeypatch.setattr(app_mod.db, "write_ping", _write)
+    asyncio.run(app_mod._startup_dbcheck())
+
+    assert "db_ok" in captured["note"]
+    assert "10.5.6.40" in captured["note"]

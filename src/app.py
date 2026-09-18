@@ -35,7 +35,17 @@ APP_VERSION = "1.1.0"
 
 
 async def _startup_dbcheck() -> None:
-    """Print one DBCHECK line so the verdict survives having no exposed port.
+    """Report the database verdict at startup, by log AND by database row.
+
+    The log line covers the case where no port is exposed. The row covers the
+    case where there is no way to read the log either - which is exactly what
+    the Agrarian Portal turned out to be: it shows pod status and offers
+    "Delete Pod", but no log viewer and no URL for an app that exposes none.
+
+    So the database doubles as the out-of-band channel: if a row appears in
+    `container_pings` carrying this pod's hostname and egress IP, the container
+    reached the database from wherever the cluster scheduled it. If no row
+    appears while the portal reports the pod Running, it did not.
 
     Runs in a worker thread and is never awaited by startup: the container must
     become ready immediately, and a slow probe must not race the HEALTHCHECK.
@@ -46,6 +56,19 @@ async def _startup_dbcheck() -> None:
         print("DBCHECK " + json.dumps(doc, separators=(",", ":"), default=str), flush=True)
     except BaseException as exc:  # noqa: BLE001 - diagnostics never break startup
         print("DBCHECK " + json.dumps({"error": dbconfig.redact(exc)}), flush=True)
+        return
+
+    if os.getenv("DBCHECK_WRITE_ON_STARTUP", "1") == "0":
+        return
+    if not doc.get("auth", {}).get("ok"):
+        return  # nothing to write with, and the log line already says why
+
+    try:
+        note = f"startup {doc.get('verdict')} · node-side egress {doc['container'].get('egress_ip')}"
+        row = await asyncio.to_thread(db.write_ping, note)
+        print("DBPING " + json.dumps(row, separators=(",", ":"), default=str), flush=True)
+    except BaseException as exc:  # noqa: BLE001
+        print("DBPING " + json.dumps({"error": dbconfig.redact(exc)}), flush=True)
 
 
 async def _keepalive_loop() -> None:
