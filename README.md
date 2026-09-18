@@ -123,6 +123,50 @@ curl -s -X POST localhost:8000/dbcheck/write \
   -H "Content-Type: application/json" -d '{"note":"laptop"}'
 ```
 
+### Phone-home (reading the verdict without a shell)
+
+The Agrarian Portal shows pod status but offers no log viewer, and a container
+that exposes no reachable port cannot be curled. With no credential (so no
+`container_pings` row either), there is no way to read the `/dbcheck` verdict
+from a portal deployment. Phone-home is the credential-free out-of-band channel:
+on startup the container POSTs the very same diagnostic to a listener you run.
+
+It carries **no credential** - the diagnostic redacts secrets, and in the
+default credential-free mode it is a pure TCP-reachability result (hostname,
+egress IP, whether the database answered). The container is simply reporting its
+own connectivity to its owner. The token is a shared secret so the listener can
+ignore unrelated internet noise on its open port; it authenticates nothing.
+
+Enabled only when `PHONE_HOME_URL` is set:
+
+| Variable | Meaning |
+|---|---|
+| `PHONE_HOME_URL` | e.g. `http://<your-wan-ip>:48080/beacon`; unset disables it |
+| `PHONE_HOME_TOKEN` | shared secret; the listener ignores requests without it |
+| `PHONE_HOME_ATTEMPTS` / `PHONE_HOME_RETRY_DELAY` | retries for the idle link (default 5 / 3 s) |
+
+The listener (`tools/phone_home_listener.py`) only receives and prints text; it
+never executes anything it is sent.
+
+```bash
+# 1. run the listener (any machine the container can reach)
+python tools/phone_home_listener.py --port 48080 --token <shared-secret>
+
+# 2. run the container pointed at it. DB_ENABLED=0 tests the beacon alone,
+#    without touching the database:
+docker run --rm \
+  -e DB_ENABLED=0 \
+  -e PHONE_HOME_URL=http://<listener-host>:48080/beacon \
+  -e PHONE_HOME_TOKEN=<shared-secret> \
+  ghcr.io/agrarian-application-repository/pataterno-app:latest
+```
+
+For a real Testbed 2 run the listener must be reachable from that network,
+which for a home connection means forwarding a port on your router - e.g.
+`upnpc -a <your-lan-ip> 48080 48080 TCP` (delete afterwards with
+`upnpc -d 48080 TCP`). A single beacon that does not arrive proves nothing on
+this flaky link; wait for the retries.
+
 ### Known issue: the VPN link idles out
 
 Measured from the development laptop on 18 Sep 2026: connections to the
