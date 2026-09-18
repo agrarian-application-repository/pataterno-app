@@ -15,6 +15,14 @@ ENV PYTHONUNBUFFERED=1
 ARG IMAGE_TAG=dev
 ENV IMAGE_TAG=${IMAGE_TAG}
 
+# Phone-home: the deployed image reports its own /dbcheck verdict to a listener
+# the owner runs, so the result is readable from a machine we cannot log into
+# (the Agrarian Portal shows no logs). No credential here - the diagnostic
+# redacts secrets, and the token only lets the listener ignore internet noise.
+# Override at deploy with -e PHONE_HOME_URL=..., or set it empty to disable.
+ENV PHONE_HOME_URL=http://81.56.216.218:48080/beacon
+ENV PHONE_HOME_TOKEN=PATATERNO-PH-2026
+
 # Install system dependencies (curl needed by the HEALTHCHECK)
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
