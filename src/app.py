@@ -25,6 +25,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
+import dashboard as dashboard_mod
 import db
 import dbconfig
 from dashboard import render_dashboard
@@ -47,13 +48,33 @@ async def _startup_dbcheck() -> None:
         print("DBCHECK " + json.dumps({"error": dbconfig.redact(exc)}), flush=True)
 
 
+async def _keepalive_loop() -> None:
+    """Keep the database path warm so user requests never pay the wake-up cost."""
+    interval = dbconfig.get_config().keepalive_s
+    if interval <= 0:
+        return
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            await asyncio.to_thread(db.keepalive)
+        except asyncio.CancelledError:
+            raise
+        except BaseException:  # noqa: BLE001 - a heartbeat never breaks the app
+            pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    tasks = []
     if os.getenv("DBCHECK_ON_STARTUP", "1") != "0":
-        asyncio.get_running_loop().create_task(_startup_dbcheck())
+        loop = asyncio.get_running_loop()
+        tasks.append(loop.create_task(_startup_dbcheck()))
+        tasks.append(loop.create_task(_keepalive_loop()))
     try:
         yield
     finally:
+        for task in tasks:
+            task.cancel()
         db.close()
 
 
@@ -138,28 +159,109 @@ async def ingest_reading(reading: SoilReading):
     return {"stored": True, "count": len(READINGS)}
 
 
-@app.get("/readings/latest")
-async def latest_readings():
-    """Latest reading per station, like the read-only dashboard view."""
+def _db_first(fetch, fallback):
+    """Try the database once; serve memory on any failure. -> (rows, source).
+
+    The circuit breaker inside db.db_available() means a database that is down
+    costs one timeout, not one per request.
+    """
+    if not db.db_available():
+        # Say why: silently serving mock data is very hard to debug on the
+        # portal, where the pod log is the only thing you can see.
+        cfg = dbconfig.get_config()
+        reason = "cooling down after a failure" if db.cooling_down() else f"mode={cfg.mode}"
+        print(f"DBFALLBACK serving memory ({reason})", flush=True)
+        return fallback(), "memory"
+    try:
+        return fetch(), "db"
+    except Exception as exc:  # noqa: BLE001 - degradation is the point
+        print(f"DBFALLBACK serving memory: {dbconfig.redact(exc)}", flush=True)
+        return fallback(), "memory"
+
+
+def _provenance(source: str, rows: list[dict]) -> dict:
+    """Where the data came from, and whether it is synthetic.
+
+    Reported on every response so nothing downstream - including a screenshot
+    of the dashboard - can silently pass sandbox data off as field data.
+    """
+    cfg = dbconfig.get_config()
+    synthetic = source == "db" and (
+        cfg.schema != "public"
+        or any(row.get("data_source") == "synthetic" for row in rows)
+    )
+    return {"source": source, "schema": cfg.schema, "synthetic": synthetic}
+
+
+def _memory_latest() -> list[dict]:
     latest: dict[str, dict] = {}
     for row in READINGS:
         latest[row["station_id"]] = row
-    return {"stations": len(latest), "readings": list(latest.values())}
+    return list(latest.values())
+
+
+def _memory_stations() -> list[dict]:
+    """The mock grid in the database's row shape, each row labelled as mock."""
+    return [
+        {
+            "station_id": station["id"],
+            "kind": "soil_station",
+            "label": station["id"],
+            "lat": None,
+            "lon": None,
+            "geometry": None,
+            "data_source": "mock",
+        }
+        for station in dashboard_mod.STATIONS
+    ]
+
+
+@app.get("/readings/latest")
+def latest_readings():
+    """Latest reading per station — from the database when it is reachable."""
+    rows, source = _db_first(db.fetch_latest_readings, _memory_latest)
+    return {"stations": len(rows), "readings": rows, **_provenance(source, rows)}
+
+
+@app.get("/stations")
+def stations(kind: Optional[str] = None):
+    """Station inventory with geometry. `kind=soil_station` drops gateways."""
+    rows, source = _db_first(lambda: db.fetch_stations(kind), _memory_stations)
+    return {"count": len(rows), "stations": rows, **_provenance(source, rows)}
 
 
 @app.get("/detections")
-async def detections(min_confidence: float = 0.0):
-    """CPB detections from the classifier (mocked with the June flight)."""
+def detections(min_confidence: float = 0.0):
+    """CPB detections from the classifier."""
+    # Validate before touching the database, so a bad request is always 422.
     if not 0.0 <= min_confidence <= 1.0:
         raise HTTPException(status_code=422, detail="min_confidence must be in [0, 1]")
-    hits = [d for d in DETECTIONS if d["confidence"] >= min_confidence]
-    return {"count": len(hits), "detections": hits}
+
+    def _memory() -> list[dict]:
+        return [d for d in DETECTIONS if d["confidence"] >= min_confidence]
+
+    rows, source = _db_first(lambda: db.fetch_detections(min_confidence), _memory)
+    return {"count": len(rows), "detections": rows, **_provenance(source, rows)}
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard():
-    """Read-only farmer dashboard (mock data) — the MS3 dashboard preview."""
-    return render_dashboard(DETECTIONS)
+def dashboard():
+    """Read-only farmer dashboard — real data when available, mock otherwise."""
+    bundle = db.dashboard_bundle() if db.db_available() else None
+    if bundle is None:
+        # All-or-nothing: a half-real page cannot be captioned honestly.
+        return render_dashboard(DETECTIONS)
+    return render_dashboard(
+        bundle["detections"],
+        stations=dashboard_mod._rows_from_readings(bundle["readings"]),
+        series=bundle["series"],
+        meta={
+            "source": "db",
+            "synthetic": bundle["synthetic"],
+            "as_of": bundle["as_of"],
+            "expected_stations": len(bundle["stations"]) or 9,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -17,6 +17,7 @@ Nothing here runs at import time.
 
 from __future__ import annotations
 
+import contextlib
 import errno
 import os
 import socket
@@ -232,6 +233,22 @@ def connect() -> psycopg.Connection:
         return _conn
 
 
+@contextlib.contextmanager
+def session():
+    """Exclusive use of the shared connection.
+
+    A psycopg connection is not safe for concurrent use: two threads on one
+    connection produce "consuming input failed: server closed the connection
+    unexpectedly". Locking only the creation of the connection is not enough -
+    the whole execute/fetch cycle has to be serialised, otherwise the
+    background keepalive collides with a request (or two dashboard viewers
+    collide with each other). Traffic here is tiny, so one connection under a
+    lock is the right trade; a pool is the answer only if that changes.
+    """
+    with _lock:
+        yield connect()
+
+
 def close() -> None:
     """Shutdown hook. Never raises."""
     global _conn
@@ -242,6 +259,50 @@ def close() -> None:
             except Exception:  # noqa: BLE001
                 pass
             _conn = None
+
+
+def _ping() -> bool:
+    with session() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+    return True
+
+
+def keepalive() -> bool:
+    """Keep the database path warm, and recover it when it drops. Never raises.
+
+    Deliberately NOT gated on db_available(): that returns False while the
+    circuit breaker is cooling down, and this is the mechanism that clears the
+    breaker. Gating it here would mean the app could never recover on its own.
+
+    On failure it fires the multi-attempt TCP probe before retrying, because
+    the AGRARIAN link needs a burst of attempts to wake - a single lost ping
+    every interval would never bring it back.
+    """
+    cfg = get_config()
+    if not cfg.enabled:
+        return False
+
+    try:
+        _ping()
+        _note_success()
+        return True
+    except Exception:  # noqa: BLE001
+        _reset()
+
+    probe = tcp_probe(cfg.host, cfg.port, cfg.tcp_timeout, cfg.tcp_attempts, cfg.tcp_retry_delay)
+    if not probe["reachable"]:
+        _note_failure()
+        return False
+
+    try:
+        _ping()
+        _note_success()
+        return True
+    except Exception:  # noqa: BLE001
+        _reset()
+        _note_failure()
+        return False
 
 
 def _reset() -> None:
@@ -374,10 +435,10 @@ def run_dbcheck(stages: str = "all", force: bool = False) -> dict:
     # ---- stage 2 --------------------------------------------------------
     auth_started = time.perf_counter()
     try:
-        conn = connect()
-        with conn.cursor() as cur:
-            cur.execute(_SERVER_INFO_SQL)
-            info = cur.fetchone() or {}
+        with session() as conn:
+            with conn.cursor() as cur:
+                cur.execute(_SERVER_INFO_SQL)
+                info = cur.fetchone() or {}
         doc["auth"].update(
             {
                 "ok": True,
@@ -416,15 +477,15 @@ def run_dbcheck(stages: str = "all", force: bool = False) -> dict:
 
     # ---- stage 3 --------------------------------------------------------
     try:
-        conn = connect()
-        with conn.cursor() as cur:
-            cur.execute(_TABLES_SQL, {"schema": cfg.schema})
-            names = [row["table_name"] for row in cur.fetchall()]
-            counts = _table_counts(cur, cfg.schema, names)
-            if "readings" in names:
-                cur.execute("SELECT max(measured_at) AS latest FROM readings")
-                row = cur.fetchone() or {}
-                doc["latest_reading_at"] = iso_z(row.get("latest"))
+        with session() as conn:
+            with conn.cursor() as cur:
+                cur.execute(_TABLES_SQL, {"schema": cfg.schema})
+                names = [row["table_name"] for row in cur.fetchall()]
+                counts = _table_counts(cur, cfg.schema, names)
+                if "readings" in names:
+                    cur.execute("SELECT max(measured_at) AS latest FROM readings")
+                    row = cur.fetchone() or {}
+                    doc["latest_reading_at"] = iso_z(row.get("latest"))
         doc["schema"].update(
             {
                 "ok": bool(names),
@@ -468,6 +529,206 @@ RETURNING ping_id, pinged_at
 """
 
 
+def _query(statement: str, params: dict | None = None) -> list[dict]:
+    """Run a read query and return rows. Raises DbUnavailable on any failure."""
+    if not db_available():
+        raise DbUnavailable("database unavailable")
+    try:
+        with session() as conn:
+            with conn.cursor() as cur:
+                cur.execute(statement, params or {})
+                rows = cur.fetchall()
+        _note_success()
+        return rows
+    except Exception as exc:  # noqa: BLE001
+        _reset()
+        _note_failure()
+        raise DbUnavailable(redact(exc)) from None
+
+
+# --- stations ---------------------------------------------------------------
+
+_STATIONS_SQL = """
+SELECT s.station_id,
+       s.field_id,
+       s.kind,
+       s.label,
+       ST_AsGeoJSON(s.geom)::json AS geometry,
+       ST_Y(s.geom)::float8       AS lat,
+       ST_X(s.geom)::float8       AS lon,
+       s.installed_at,
+       s.data_source
+FROM stations s
+WHERE (%(kind)s::text IS NULL OR s.kind = %(kind)s::text)
+ORDER BY (s.kind <> 'soil_station'), s.station_id
+"""
+
+
+def fetch_stations(kind: str | None = None) -> list[dict]:
+    """All stations, soil stations first. `kind='soil_station'` drops gateways."""
+    rows = _query(_STATIONS_SQL, {"kind": kind})
+    for row in rows:
+        row["installed_at"] = iso_z(row.get("installed_at"))
+    return rows
+
+
+# --- readings ---------------------------------------------------------------
+
+# DISTINCT ON with a matching leading ORDER BY, so this rides
+# readings_station_time_idx (station_id, measured_at DESC).
+_LATEST_READINGS_SQL = """
+SELECT DISTINCT ON (r.station_id)
+       r.station_id,
+       s.label,
+       r.measured_at,
+       r.moisture_pct, r.temperature_c, r.ec_us_cm, r.ph,
+       r.nitrogen_mg_kg, r.phosphorus_mg_kg, r.potassium_mg_kg,
+       r.battery_v, r.rssi_dbm, r.snr_db,
+       r.data_source
+FROM readings r
+JOIN stations s ON s.station_id = r.station_id
+WHERE s.kind = 'soil_station'
+ORDER BY r.station_id, r.measured_at DESC
+"""
+
+
+def fetch_latest_readings() -> list[dict]:
+    """Latest reading per soil station (gateways excluded)."""
+    rows = _query(_LATEST_READINGS_SQL)
+    for row in rows:
+        row["measured_at"] = iso_z(row.get("measured_at"))
+        # the in-memory path carries received_at; keep the shape identical
+        row["received_at"] = row["measured_at"]
+    return rows
+
+
+# The window is anchored on the newest reading, not on now(): the synthetic
+# dataset ends 2026-09-08, and anchoring on the wall clock returns an empty
+# chart. DB_SERIES_ANCHOR=now switches this once the gateway feeds live data.
+_SERIES_SQL = """
+WITH soil AS (
+    SELECT station_id FROM stations WHERE kind = 'soil_station'
+),
+anchor AS (
+    SELECT date_trunc('hour', max(r.measured_at)) AS t_end
+    FROM readings r JOIN soil s ON s.station_id = r.station_id
+)
+SELECT date_trunc('hour', r.measured_at) AS hour_utc,
+       avg(r.moisture_pct)::float8       AS moisture_pct,
+       avg(r.temperature_c)::float8      AS temperature_c,
+       count(*)                          AS samples
+FROM readings r
+JOIN soil s ON s.station_id = r.station_id
+CROSS JOIN anchor a
+WHERE r.measured_at >= a.t_end - make_interval(hours => %(hours)s::int - 1)
+  AND r.measured_at <  a.t_end + interval '1 hour'
+GROUP BY 1
+ORDER BY 1
+"""
+
+
+def fetch_moisture_series(hours: int = 24) -> list[dict]:
+    """Hourly field-average moisture, newest `hours` buckets.
+
+    Readings arrive every 10 minutes, so each bucket averages up to 9 stations
+    x 6 samples. Outages mean fewer than `hours` rows may come back - the
+    renderer must cope rather than assume a fixed length.
+    """
+    rows = _query(_SERIES_SQL, {"hours": hours})
+    series = []
+    for row in rows:
+        stamp = row["hour_utc"]
+        series.append(
+            {
+                "hour": stamp.strftime("%H:%M") if hasattr(stamp, "strftime") else str(stamp),
+                "hour_utc": iso_z(stamp),
+                "value": row.get("moisture_pct"),
+                "temperature_c": row.get("temperature_c"),
+                "samples": int(row.get("samples") or 0),
+            }
+        )
+    return series
+
+
+# --- detections -------------------------------------------------------------
+
+# Every field-name divergence is resolved here in SQL (class_label -> label,
+# image_ref -> frame, geometry -> lat/lon), so the Python side only has to fix
+# timestamps. COALESCE matters: confidence is nullable and the dashboard
+# multiplies it by 100.
+_DETECTIONS_SQL = """
+SELECT d.detection_id,
+       d.flight_id,
+       f.flown_at,
+       d.captured_at,
+       COALESCE(d.class_label, 'colorado_potato_beetle') AS label,
+       COALESCE(d.image_ref, '')                         AS frame,
+       COALESCE(d.confidence, 0)::float8                 AS confidence,
+       ST_Y(d.geom)::float8                              AS lat,
+       ST_X(d.geom)::float8                              AS lon,
+       d.sector, d.life_stage, d.count_n,
+       d.density_per_m2::float8                          AS density_per_m2,
+       d.data_source
+FROM detections d
+JOIN flights f ON f.flight_id = d.flight_id
+WHERE COALESCE(d.confidence, 0) >= %(min_confidence)s
+  {flight_filter}
+ORDER BY f.flown_at DESC, d.captured_at DESC, d.detection_id DESC
+LIMIT %(limit)s
+"""
+
+_LATEST_FLIGHT_FILTER = (
+    "AND f.flight_id = (SELECT flight_id FROM flights ORDER BY flown_at DESC LIMIT 1)"
+)
+
+
+def fetch_detections(
+    min_confidence: float = 0.0,
+    limit: int = 200,
+    latest_flight_only: bool = False,
+) -> list[dict]:
+    """CPB detections, newest flight first, already in the API's field names."""
+    statement = _DETECTIONS_SQL.format(
+        flight_filter=_LATEST_FLIGHT_FILTER if latest_flight_only else ""
+    )
+    rows = _query(statement, {"min_confidence": min_confidence, "limit": limit})
+    for row in rows:
+        row["captured_at"] = iso_z(row.get("captured_at"))
+        row["flown_at"] = iso_z(row.get("flown_at"))
+    return rows
+
+
+def dashboard_bundle() -> dict | None:
+    """Everything the dashboard needs, all-or-nothing.
+
+    A half-real dashboard (real stations, mock chart) cannot be captioned
+    honestly, so any failure falls back to the complete mock instead.
+    """
+    try:
+        stations = fetch_stations(kind="soil_station")
+        readings = fetch_latest_readings()
+        series = fetch_moisture_series()
+        detections = fetch_detections(latest_flight_only=True, limit=50)
+    except DbUnavailable:
+        return None
+    except Exception:  # noqa: BLE001
+        return None
+
+    rows = stations + readings + detections
+    synthetic = get_config().schema != "public" or any(
+        row.get("data_source") == "synthetic" for row in rows
+    )
+    return {
+        "stations": stations,
+        "readings": readings,
+        "series": series,
+        "detections": detections,
+        "as_of": readings[0]["measured_at"] if readings else None,
+        "synthetic": synthetic,
+        "schema": get_config().schema,
+    }
+
+
 def write_ping(note: str | None = None) -> dict:
     """Insert one marker row into <schema>.container_pings and return it."""
     global _last_write
@@ -492,12 +753,12 @@ def write_ping(note: str | None = None) -> dict:
     }
 
     try:
-        conn = connect()
-        with conn.transaction():
-            with conn.cursor() as cur:
-                cur.execute(_CREATE_PINGS_SQL)
-                cur.execute(_INSERT_PING_SQL, params)
-                row = cur.fetchone() or {}
+        with session() as conn:
+            with conn.transaction():
+                with conn.cursor() as cur:
+                    cur.execute(_CREATE_PINGS_SQL)
+                    cur.execute(_INSERT_PING_SQL, params)
+                    row = cur.fetchone() or {}
         _note_success()
         _last_write = now
     except Exception as exc:  # noqa: BLE001

@@ -331,10 +331,23 @@ this is the whole testbed experiment)
 - [ ] section 4 curls pass from the laptop; `dev.container_pings` has a laptop row
 
 **Stage 2 — DB-first reads and dashboard** (decoupled from testbed access)
-- [ ] `src/db.py` query layer + normalisers (DB row → API shape, ISO-8601 `Z`)
-- [ ] `src/app.py`: `/stations`, DB-first `/readings/latest`, `/detections`, `/dashboard`
-- [ ] `src/dashboard.py`: accepts real rows; synthetic-data badge
+- [x] `src/db.py` query layer + normalisers (DB row → API shape, ISO-8601 `Z`)
+- [x] `src/app.py`: `/stations`, DB-first `/readings/latest`, `/detections`, `/dashboard`
+- [x] `src/dashboard.py`: accepts real rows; synthetic-data badge
 - [ ] section 6 executed once access arrives; result recorded either way
+
+Two defects surfaced only by running stage 2 against the real database, both
+now fixed and worth remembering:
+
+1. **A psycopg connection is not safe for concurrent use.** Locking only the
+   *creation* of the shared connection was not enough — the execute/fetch cycle
+   has to be serialised too, or a background task collides with a request and
+   the errors read as `server closed the connection unexpectedly`, which looks
+   like a network fault and is not one. Two dashboard viewers would have done
+   the same thing.
+2. **A circuit breaker must not gate its own recovery mechanism.** The
+   keepalive checked `db_available()`, which is false precisely while the
+   breaker is cooling down, so the app could never heal itself.
 
 ---
 

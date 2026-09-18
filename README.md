@@ -23,8 +23,21 @@ This demo exercises the full AGRARIAN application pipeline described in the Deve
 | GET | `/readings/latest` | Latest reading per station |
 | GET | `/detections?min_confidence=0.9` | CPB detections above a confidence threshold |
 | GET | `/dashboard` | Farmer dashboard (mock, Italian UI) — station grid, moisture trend, CPB alerts, treatment advice. Preview of the MS3 dashboard. |
+| GET | `/stations` | Station inventory with GeoJSON geometry (`?kind=soil_station` drops gateways) |
 | GET | `/dbcheck` | Is the AGRARIAN database reachable from here, and if not, why not (see Database) |
 | POST | `/dbcheck/write` | Write one marker row into `<schema>.container_pings` |
+
+`/readings/latest`, `/detections`, `/stations` and `/dashboard` read from the
+database when it is reachable and fall back to the built-in demo data
+otherwise. Every JSON response says which happened:
+
+```json
+{ "source": "db" | "memory", "schema": "dev", "synthetic": true }
+```
+
+`synthetic` is true whenever the rows come from the `dev` sandbox, and the
+dashboard shows a matching amber badge — so neither an API consumer nor a
+screenshot can mistake sandbox data for field data.
 
 ## Run locally
 
@@ -67,7 +80,8 @@ development) → environment → `/app/config/db.env` (operator-mounted override
 | `DB_SCHEMA` | `dev` | `dev` = synthetic sandbox; `public` = real data, once the gateway writes there |
 | `DB_CONNECT_TIMEOUT` / `DB_TCP_TIMEOUT` | `5` / `3` | libpq connect, and the shorter credential-free probe |
 | `DB_STATEMENT_TIMEOUT` | `10000` | milliseconds |
-| `DB_COOLDOWN_S` | `30` | after a failure, skip the database for this long rather than pay the timeout on every request |
+| `DB_COOLDOWN_S` | `15` | after a failure, skip the database for this long rather than pay the timeout on every request |
+| `DB_KEEPALIVE_S` | `0` | background ping to keep an idle-dropping link warm; off by default (see below) |
 | `APP_PORT` | `80` | listen port |
 
 To supply the credential, copy `config/db.env.example` and either save it as
@@ -108,3 +122,22 @@ curl -s localhost:8000/dbcheck | python -m json.tool
 curl -s -X POST localhost:8000/dbcheck/write \
   -H "Content-Type: application/json" -d '{"note":"laptop"}'
 ```
+
+### Known issue: the VPN link idles out
+
+Measured from the development laptop on 18 Sep 2026: connections to the
+database fail for the first ~10–30 s after the link has been idle, then succeed
+in ~60 ms and stay fast. It is the link, not this code — .NET and Python
+sockets were interleaved and fail together, succeed together — and the
+`PersistentKeepalive = 21` in the WireGuard profile does not prevent it.
+
+Two consequences:
+
+- `/dbcheck` retries its TCP stage with a delay (`DB_TCP_ATTEMPTS`,
+  `DB_TCP_RETRY_DELAY`) and reports `attempts`. **A single timeout proves
+  nothing** — do not read one `filtered` verdict as "the network blocks this".
+- A data request that lands in a dead window falls back to the demo data and
+  logs one `DBFALLBACK` line saying why. `DB_KEEPALIVE_S=20` enables a
+  background ping that keeps the link warm, but it is **off by default**: it
+  could not be validated over this link, and the portal reaches the database on
+  NCSRD's own network, where the problem is not expected to exist.

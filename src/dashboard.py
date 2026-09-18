@@ -7,6 +7,8 @@ Bilingual (Italian default, English toggle). All data is mocked in
 this demo; the production version reads the AGRARIAN PostgreSQL.
 """
 
+import html
+
 # 24 hourly soil-moisture values (%) — field-realistic mock (dawn peak,
 # midday dry-down, evening recovery)
 MOISTURE_24H = [
@@ -34,7 +36,11 @@ I18N = {
         "title": "PATATERNO · Cruscotto campo — Petrizzo",
         "farm": "Azienda Petrizzo — campo patate",
         "demo": "DEMO · DATI SIMULATI",
+        "synthetic": "DATI SINTETICI · schema dev",
+        "live": "DATI DI CAMPO",
         "updated": "agg. 21 luglio 2026 · 07:40",
+        "updated_label": "agg.",
+        "avg_of_stations": "media delle stazioni",
         "stations_active": "Stazioni attive",
         "all_online": "✓ tutte online",
         "avg_moisture": "Umidità media suolo",
@@ -67,7 +73,11 @@ I18N = {
         "title": "PATATERNO · Field dashboard — Petrizzo",
         "farm": "Petrizzo farm — potato field",
         "demo": "DEMO · MOCK DATA",
+        "synthetic": "SYNTHETIC DATA · schema dev",
+        "live": "FIELD DATA",
         "updated": "updated 21 July 2026 · 07:40",
+        "updated_label": "updated",
+        "avg_of_stations": "average of the stations",
         "stations_active": "Active stations",
         "all_online": "✓ all online",
         "avg_moisture": "Avg soil moisture",
@@ -100,16 +110,61 @@ I18N = {
 
 
 def _t(key: str) -> str:
-    """Italian default text plus the data-i18n hook for the JS toggle."""
+    """Italian default text plus the data-i18n hook for the JS toggle.
+
+    Only ever wrap STATIC text: setLang() overwrites the element's content from
+    the JS dictionary, so a dynamic value placed in here reverts to the
+    hardcoded string the first time someone switches language.
+    """
     return f'<span data-i18n="{key}">{I18N["it"][key]}</span>'
 
 
-def _moisture_chart_svg() -> str:
-    """Single-series line chart of the last 24 h of average soil moisture."""
+def _fmt(value, digits: int = 0, dash: str = "—") -> str:
+    """Format a nullable number. Every numeric column in the schema is
+    nullable, and f"{None:.0f}" raises."""
+    if value is None:
+        return dash
+    try:
+        return f"{float(value):.{digits}f}"
+    except (TypeError, ValueError):
+        return dash
+
+
+def _short_id(station_id) -> str:
+    """'station-03' -> 'ST-03'. Database ids such as 'A1' pass through."""
+    return html.escape(str(station_id).replace("station-", "ST-"))
+
+
+def _mock_series() -> list[dict]:
+    return [
+        {"hour": f"{i:02d}:00", "value": value, "samples": 0}
+        for i, value in enumerate(MOISTURE_24H)
+    ]
+
+
+def _moisture_chart_svg(series: list[dict] | None = None) -> str:
+    """Single-series line chart of field-average soil moisture.
+
+    Takes whatever buckets it is given: real data has gaps (four deliberate
+    outages in the sandbox), so neither the count nor a fixed y-range can be
+    assumed, and the x labels come from the data rather than the index.
+    """
+    points = [p for p in (series or _mock_series()) if p.get("value") is not None]
     w, h = 720, 190
     pad_l, pad_r, pad_t, pad_b = 44, 16, 14, 26
-    y_min, y_max = 30.0, 46.0
-    n = len(MOISTURE_24H)
+
+    if len(points) < 2:
+        return (
+            f'<svg viewBox="0 0 {w} {h}" role="img" '
+            f'aria-label="{I18N["it"]["chart_aria"]}">'
+            f'<text x="{w / 2}" y="{h / 2}" text-anchor="middle" class="tick">—</text></svg>'
+        )
+
+    values = [float(p["value"]) for p in points]
+    lo, hi = min(values), max(values)
+    pad = max((hi - lo) * 0.25, 1.0)
+    y_min, y_max = lo - pad, hi + pad
+    n = len(points)
 
     def x(i: float) -> float:
         return pad_l + i * (w - pad_l - pad_r) / (n - 1)
@@ -117,25 +172,31 @@ def _moisture_chart_svg() -> str:
     def y(v: float) -> float:
         return pad_t + (y_max - v) * (h - pad_t - pad_b) / (y_max - y_min)
 
-    pts = " ".join(f"{x(i):.1f},{y(v):.1f}" for i, v in enumerate(MOISTURE_24H))
+    pts = " ".join(f"{x(i):.1f},{y(v):.1f}" for i, v in enumerate(values))
 
+    ticks = [y_min + (y_max - y_min) * f for f in (0.0, 0.33, 0.66, 1.0)]
     grid = "".join(
         f'<line x1="{pad_l}" y1="{y(v):.1f}" x2="{w - pad_r}" y2="{y(v):.1f}" '
         f'class="grid"/><text x="{pad_l - 6}" y="{y(v) + 3.5:.1f}" class="tick" '
         f'text-anchor="end">{v:.0f}%</text>'
-        for v in (30, 35, 40, 45)
+        for v in ticks
     )
+
+    step = max(1, (n - 1) // 4)
+    label_at = sorted({0, *range(step, n - 1, step), n - 1})
     hours = "".join(
-        f'<text x="{x(i):.1f}" y="{h - 8}" class="tick" text-anchor="middle">{i:02d}</text>'
-        for i in (0, 6, 12, 18, 23)
+        f'<text x="{x(i):.1f}" y="{h - 8}" class="tick" text-anchor="middle">'
+        f'{html.escape(str(points[i].get("hour", i)))}</text>'
+        for i in label_at
     )
+
     # invisible wide hit-targets for the hover tooltip
     hits = "".join(
         f'<circle cx="{x(i):.1f}" cy="{y(v):.1f}" r="12" class="hit" '
-        f'data-h="{i:02d}:00" data-v="{v:.1f}"/>'
-        for i, v in enumerate(MOISTURE_24H)
+        f'data-h="{html.escape(str(points[i].get("hour", i)))}" data-v="{v:.1f}"/>'
+        for i, v in enumerate(values)
     )
-    last = MOISTURE_24H[-1]
+    last = values[-1]
     return f"""
 <svg viewBox="0 0 {w} {h}" role="img" aria-label="{I18N['it']['chart_aria']}">
   {grid}{hours}
@@ -148,35 +209,98 @@ def _moisture_chart_svg() -> str:
 </svg>"""
 
 
-def render_dashboard(detections: list[dict]) -> str:
+def _rows_from_readings(readings: list[dict]) -> list[dict]:
+    """Map database readings onto the shape the template renders.
+
+    A station counts as 'low' below 35% moisture, matching the mock's own
+    threshold (station-03 sits at 31.4%).
+    """
+    rows = []
+    for reading in readings:
+        moisture = reading.get("moisture_pct")
+        rows.append(
+            {
+                "id": reading.get("station_id"),
+                "moisture": moisture,
+                "temp": reading.get("temperature_c"),
+                "status": "low" if (moisture is not None and moisture < 35) else "ok",
+            }
+        )
+    return rows
+
+
+def render_dashboard(
+    detections: list[dict],
+    stations: list[dict] | None = None,
+    series: list[dict] | None = None,
+    meta: dict | None = None,
+) -> str:
+    """Render the farmer dashboard.
+
+    Called with only `detections` it reproduces the original mock page, so the
+    demo keeps working when the database is unreachable. `stations` and
+    `series` carry real rows; `meta` says where the data came from, which
+    decides the provenance badge and the timestamp.
+    """
     import json
 
-    n_online = len(STATIONS)
-    avg_m = sum(s["moisture"] for s in STATIONS) / n_online
-    avg_t = sum(s["temp"] for s in STATIONS) / n_online
+    meta = meta or {}
+    source = meta.get("source", "memory")
+    # A real flight yields dozens of detections; listing them all pushes the
+    # rest of the page off screen. The tile keeps the true total.
+    detection_total = meta.get("detection_count", len(detections))
+    detections = detections[: meta.get("detection_limit", 8)]
+    rows = stations if stations is not None else STATIONS
+    n_online = len(rows)
+    n_total = meta.get("expected_stations", 9 if source == "memory" else n_online)
+
+    moistures = [r["moisture"] for r in rows if r.get("moisture") is not None]
+    temps = [r["temp"] for r in rows if r.get("temp") is not None]
+    avg_m = sum(moistures) / len(moistures) if moistures else None
+    avg_t = sum(temps) / len(temps) if temps else None
+
+    # Provenance badge: synthetic sandbox data must never be mistaken for field
+    # data in a screenshot.
+    if source == "db":
+        badge_key = "synthetic" if meta.get("synthetic") else "live"
+        badge_class = "demo-tag synthetic" if meta.get("synthetic") else "demo-tag live"
+    else:
+        badge_key, badge_class = "demo", "demo-tag"
+
+    as_of = meta.get("as_of")
+    if as_of:
+        # Rendered OUTSIDE any data-i18n element, or setLang() would replace
+        # this real timestamp with the hardcoded mock one.
+        when = (
+            f"{_t('updated_label')} "
+            f"<span>{html.escape(str(as_of).replace('T', ' · ').replace('Z', ' UTC'))}</span>"
+        )
+    else:
+        when = _t("updated")
 
     cells = "".join(
         f"""<div class="cell {s['status']}">
-  <div class="cell-id">{s['id'].replace('station-', 'ST-')}</div>
-  <div class="cell-val">{s['moisture']:.0f}%</div>
+  <div class="cell-id">{_short_id(s['id'])}</div>
+  <div class="cell-val">{_fmt(s['moisture'])}%</div>
   <div class="cell-status">{_t('st_low') if s['status'] == 'low' else _t('st_ok')}</div>
 </div>"""
-        for s in STATIONS
+        for s in rows
     )
 
     det_rows = "".join(
         f"""<li>
   <span class="det-badge">🪲</span>
-  <div><strong>{_t('cpb_detected')}</strong> — {_t('confidence')} {d['confidence'] * 100:.0f}%
-  <div class="det-meta">{d['captured_at'].replace('T', ' · ').replace('Z', ' UTC')} · {d['lat']}N {d['lon']}E · {d['frame']}</div></div>
+  <div><strong>{_t('cpb_detected')}</strong> — {_t('confidence')} {_fmt((d.get('confidence') or 0) * 100)}%
+  <div class="det-meta">{html.escape(str(d.get('captured_at', '')).replace('T', ' · ').replace('Z', ' UTC'))} · {_fmt(d.get('lat'), 2)}N {_fmt(d.get('lon'), 2)}E · {html.escape(str(d.get('frame', '')))}</div></div>
 </li>"""
         for d in detections
     )
 
     table_rows = "".join(
-        f"<tr><td>{s['id']}</td><td>{s['moisture']:.1f}</td><td>{s['temp']:.1f}</td>"
+        f"<tr><td>{html.escape(str(s['id']))}</td><td>{_fmt(s['moisture'], 1)}</td>"
+        f"<td>{_fmt(s['temp'], 1)}</td>"
         f"<td>{_t('row_low') if s['status'] == 'low' else _t('row_ok')}</td></tr>"
-        for s in STATIONS
+        for s in rows
     )
 
     return f"""<!doctype html>
@@ -211,6 +335,12 @@ def render_dashboard(detections: list[dict]) -> str:
   header h1 {{ font-size: 20px; }} header h1 span.brand {{ color: var(--brand); }}
   .demo-tag {{ font-size: 11px; letter-spacing: .06em; border: 1px solid var(--border);
     border-radius: 99px; padding: 2px 10px; color: var(--ink-2); }}
+  /* Synthetic data must be unmissable in a screenshot. */
+  .demo-tag.synthetic {{ border-color: var(--warn); color: var(--warn); font-weight: 700;
+    background: repeating-linear-gradient(45deg, transparent, transparent 5px,
+      color-mix(in srgb, var(--warn) 14%, transparent) 5px,
+      color-mix(in srgb, var(--warn) 14%, transparent) 10px); }}
+  .demo-tag.live {{ border-color: var(--good); color: var(--good); font-weight: 700; }}
   header .right {{ margin-left: auto; display: flex; gap: 10px; align-items: center; }}
   header .when {{ color: var(--muted); font-size: 13px; }}
   .lang {{ display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }}
@@ -266,9 +396,9 @@ def render_dashboard(detections: list[dict]) -> str:
 <div class="wrap">
   <header>
     <h1><span class="brand">PATATERNO</span> · {_t('farm')}</h1>
-    <span class="demo-tag">{_t('demo')}</span>
+    <span class="{badge_class}">{_t(badge_key)}</span>
     <span class="right">
-      <span class="when">{_t('updated')}</span>
+      <span class="when">{when}</span>
       <span class="lang" role="group" aria-label="Lingua / Language">
         <button id="btn-it" class="active" onclick="setLang('it')">IT</button>
         <button id="btn-en" onclick="setLang('en')">EN</button>
@@ -279,29 +409,29 @@ def render_dashboard(detections: list[dict]) -> str:
   <div class="tiles">
     <div class="card tile">
       <div class="label">{_t('stations_active')}</div>
-      <div class="value">{n_online} / 9</div>
+      <div class="value">{n_online} / {n_total}</div>
       <div class="status-line good">{_t('all_online')}</div>
     </div>
     <div class="card tile">
       <div class="label">{_t('avg_moisture')}</div>
-      <div class="value">{avg_m:.1f}%</div>
+      <div class="value">{_fmt(avg_m, 1)}%</div>
       <div class="sub">{_t('target_range')}</div>
     </div>
     <div class="card tile">
       <div class="label">{_t('soil_temp')}</div>
-      <div class="value">{avg_t:.1f}°C</div>
-      <div class="sub">{_t('avg_of_9')}</div>
+      <div class="value">{_fmt(avg_t, 1)}°C</div>
+      <div class="sub">{_t('avg_of_9') if n_total == 9 else _t('avg_of_stations')}</div>
     </div>
     <div class="card tile">
       <div class="label">{_t('cpb_alert')}</div>
-      <div class="value">{len(detections)}</div>
+      <div class="value">{detection_total}</div>
       <div class="status-line warn">{_t('to_verify')}</div>
     </div>
   </div>
 
   <div class="card">
     <h2>{_t('chart_title')}</h2>
-    {_moisture_chart_svg()}
+    {_moisture_chart_svg(series)}
   </div>
 
   <div class="cols">

@@ -47,7 +47,19 @@ DEFAULTS: dict[str, str] = {
     "DB_TCP_ATTEMPTS": "5",
     "DB_TCP_RETRY_DELAY": "3",
     "DB_STATEMENT_TIMEOUT": "10000",
-    "DB_COOLDOWN_S": "30",
+    # After a failure, skip the database for this long rather than pay the
+    # timeout on every request. Kept short because a successful keepalive
+    # clears it anyway, and a long cooldown means a long stretch of mock data.
+    "DB_COOLDOWN_S": "15",
+    # Background ping; 0 disables, which is the default.
+    #
+    # It exists because the VPN link from the development laptop drops when
+    # idle, but it is OFF by default: over that same flaky link it could not be
+    # validated (the process stopped serving during one soak run), and the
+    # portal reaches this database on NCSRD's own network, where the idling
+    # does not apply. Enable it with DB_KEEPALIVE_S=20 if a deployment turns
+    # out to need it - and watch for the app becoming unresponsive.
+    "DB_KEEPALIVE_S": "0",
 }
 
 # Keys that select *where* config comes from. Only the real environment may set
@@ -111,6 +123,7 @@ class DbConfig:
     tcp_retry_delay: float
     statement_timeout_ms: int
     cooldown_s: float
+    keepalive_s: float
     mode: str  # "enabled" | "no_credentials" | "disabled"
     origin: dict[str, str]
     env_file: str
@@ -210,7 +223,8 @@ def load_config() -> DbConfig:
         tcp_attempts=max(1, _as_int(values["DB_TCP_ATTEMPTS"], 3)),
         tcp_retry_delay=_as_float(values["DB_TCP_RETRY_DELAY"], 2.0),
         statement_timeout_ms=_as_int(values["DB_STATEMENT_TIMEOUT"], 10000),
-        cooldown_s=_as_float(values["DB_COOLDOWN_S"], 30.0),
+        cooldown_s=_as_float(values["DB_COOLDOWN_S"], 15.0),
+        keepalive_s=_as_float(values["DB_KEEPALIVE_S"], 0.0),
         mode=mode,
         origin=origin,
         env_file=str(mounted_path),
