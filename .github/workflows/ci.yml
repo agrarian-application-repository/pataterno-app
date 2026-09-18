@@ -21,6 +21,10 @@ jobs:
   test-application:
     name: Test Application
     runs-on: ubuntu-latest
+    env:
+      # No database is reachable from a GitHub runner. This is also the only
+      # mode in which the connector opens no socket at all.
+      DB_ENABLED: "0"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -77,6 +81,9 @@ jobs:
       - name: Set lowercase image name
         run: echo "IMAGE_NAME=${IMAGE_NAME,,}" >> "$GITHUB_ENV"
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -94,6 +101,8 @@ jobs:
           file: ./Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            IMAGE_TAG=sha-${{ github.sha }}
           tags: |
             ghcr.io/${{ env.IMAGE_NAME }}:latest
             ghcr.io/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
@@ -127,7 +136,9 @@ jobs:
           }
 
           echo "Starting container..."
-          docker run -d --name test-app -p 8080:80 "$IMAGE" || {
+          # DB_ENABLED=0: no AGRARIAN network from a GitHub runner, so the
+          # connector must not spend its connect timeout on every request.
+          docker run -d --name test-app -p 8080:80 -e DB_ENABLED=0 "$IMAGE" || {
             echo "❌ Failed to start container"
             exit 1
           }
@@ -150,6 +161,18 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"station_id":"station-01","moisture_pct":41.2,"temperature_c":22.8,"ec_us_cm":310,"ph":6.7}' || {
             echo "⚠️ Ingestion test failed, but continuing..."
+          }
+
+          echo "Testing database diagnostics..."
+          curl -fsS http://localhost:8080/dbcheck | head -c 600 || {
+            echo "⚠️ dbcheck failed, but continuing..."
+          }
+
+          # The startup line is how the testbed reports its verdict when no port
+          # is exposed, so prove here that it actually reaches the container log.
+          echo "Checking the DBCHECK startup line..."
+          docker logs test-app 2>&1 | grep -m1 DBCHECK || {
+            echo "⚠️ no DBCHECK line in the container log, but continuing..."
           }
 
           echo "Cleaning up..."

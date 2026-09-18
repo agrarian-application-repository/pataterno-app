@@ -4,3 +4,9 @@ __pycache__/
 venv/
 .env
 *.log
+.pytest_cache/
+
+# Operator-mounted override, never committed.
+# config/defaults.env IS committed on purpose - it carries the dev-schema
+# defaults that ship in the image.
+config/db.env
