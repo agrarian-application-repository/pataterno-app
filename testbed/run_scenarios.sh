@@ -13,13 +13,17 @@
 #
 # Usage (root, testbed up via opensand/up.sh):
 #   ./run_scenarios.sh [image]       default: ghcr.io/agrarian-application-repository/pataterno-app:latest
-# Env: PASS_UP (s, default 20), PASS_DOWN (s, default 40), FRAMES_B_REPEAT (default 3)
+# Env: PASS_UP (s, default 20), PASS_DOWN (s, default 40), FRAMES_B_REPEAT (default 3),
+#      PERSISTENT (1 = one connection reused, default; 0 = one per message),
+#      SCENARIOS ("A B", default), OUT_TAG (results sub-folder, default none)
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE="${1:-ghcr.io/agrarian-application-repository/pataterno-app:latest}"
 FRAMES="$HERE/frames"
-OUT="$HERE/results"
+OUT="$HERE/results${OUT_TAG:+/$OUT_TAG}"
 mkdir -p "$OUT"
+PERSISTENT="${PERSISTENT:-1}"
+SCENARIOS="${SCENARIOS:-A B}"
 PASS_UP="${PASS_UP:-20}"; PASS_DOWN="${PASS_DOWN:-40}"; REPEAT_B="${FRAMES_B_REPEAT:-3}"
 EDGE_URL="http://192.168.1.2:8080"
 
@@ -51,13 +55,15 @@ run_producer() { # $1 name, extra env...
   docker run --rm --name "pt-producer-$name" --network container:os-ws-st \
     -e ROLE=producer -e EDGE_URL="$EDGE_URL" -e FRAMES_DIR=/frames \
     -e RESULTS_PATH="/out/scenario_$name.json" -e HTTP_TIMEOUT_S=10 -e RETRY_DELAY_S=2 \
+    -e PERSISTENT="$PERSISTENT" \
     "$@" -v "$FRAMES":/frames:ro -v "$OUT":/out "$IMAGE"
 }
 
 echo "== reachability across the satellite"
 docker exec os-ws-st sh -c "curl -s -o /dev/null -w 'edge /health over the satellite: %{http_code} in %{time_total}s\n' $EDGE_URL/health" 2>/dev/null || true
 
-echo "== Scenario A: continuous link"
+if [[ " $SCENARIOS " == *" A "* ]]; then
+echo "== Scenario A: continuous link (PERSISTENT=$PERSISTENT)"
 "$HERE/opensand/leo_passes.sh" --clear >/dev/null 2>&1 || true
 start_edge
 docker exec os-ws-st sh -c "curl -s -o /dev/null -w 'edge /health over the satellite: %{http_code} in %{time_total}s\n' $EDGE_URL/health"
@@ -67,8 +73,10 @@ TX1=$(txb); RX1=$(rxb)
 echo "{\"scenario\":\"A\",\"ip_bytes_into_satellite\":$((TX1-TX0)),\"ip_bytes_back\":$((RX1-RX0))}" > "$OUT/link_A.json"
 cat "$OUT/link_A.json"
 docker exec pt-edge curl -fs "http://localhost:8080/alerts?limit=5" > "$OUT/alerts_A.json"
+fi
 
-echo "== Scenario B: LEO passes ${PASS_UP}s up / ${PASS_DOWN}s down, starting in a gap"
+if [[ " $SCENARIOS " == *" B "* ]]; then
+echo "== Scenario B: LEO passes ${PASS_UP}s up / ${PASS_DOWN}s down, starting in a gap (PERSISTENT=$PERSISTENT)"
 start_edge
 TX0=$(txb); RX0=$(rxb)
 "$HERE/opensand/leo_passes.sh" --start down --up "$PASS_UP" --down "$PASS_DOWN" --cycles 3 > "$OUT/passes_B.log" 2>&1 &
@@ -82,5 +90,6 @@ echo "{\"scenario\":\"B\",\"pass_up_s\":$PASS_UP,\"pass_down_s\":$PASS_DOWN,\"ip
 cat "$OUT/link_B.json"
 cp "$HERE/opensand/results/leo_passes.log" "$OUT/leo_passes_B.log" 2>/dev/null || true
 docker exec pt-edge curl -fs "http://localhost:8080/alerts?limit=20" > "$OUT/alerts_B.json"
+fi
 
 echo "== edge left running for the dashboard: http://localhost:18080/dashboard"

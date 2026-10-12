@@ -53,17 +53,22 @@ and `testbed/results/`):
 | Round trip ws_st <-> ws_gw | 522 ms | 81 ms |
 | TCP farm -> edge (DVB-RCS2 return link) | 2.6 Mbit/s | 2.85 Mbit/s |
 | TCP edge -> farm (DVB-S2 forward link) | 4.2-10.8 Mbit/s | 83 Mbit/s |
-| 3 drone frames, continuous link: detection at the edge (p50) | 7.4 s | 1.35 s |
-| 3 drone frames, continuous link: summary at the edge (p50) | 2.1 s | 0.33 s |
-| 9 frames, link starting in a 40 s gap, 20 s passes: worst detection | 77.0 s | 43.0 s |
-| 9 frames, link starting in a 40 s gap, 20 s passes: worst summary | 39.9 s | 41.4 s |
-| Bytes: raw frames -> IP bytes into the satellite terminal | 18.35 MB -> 395.4 kB (-97.85%) | same |
+| 3 drone frames, continuous link: detection at the edge (p50), one reused connection | 4.3 s | 0.98 s |
+| same, one TCP connection per message (v1.2.0 producer) | 7.4 s | 1.34 s |
+| 3 frames, link starting in a gap of 10 / 20 / 40 / 80 s: worst detection | 13.3 / 28.6 / 43.3 / 83.1 s | 9.6 / 19.6 / 39.6 / 82.1 s |
+| 9 frames, link starting in a 40 s gap, 20 s passes: worst detection | 49.5 s | 42.3 s |
+| Bytes: raw frames -> IP bytes into the satellite terminal | 18.35 MB -> 392.7 kB (-97.86%) | same |
 
 With intermittent visibility every message was delivered (27 of 27), in
 priority order: all summaries, then all crops, then all previews. KPI-2 counts
 the detection (the classified crops), not the summary; times start when the
 frame enters the producer, so the drone-to-producer time is not included.
-`testbed/run_scenarios.sh` reproduces both scenarios with the published image.
+`testbed/run_scenarios.sh` (continuous link and 40 s gaps) and `testbed/gap_sweep.sh`
+(gap length sweep) reproduce these runs with the published image; results are in
+`testbed/results/{geo125,leo15}_v13*` and `testbed/results/sweep_*`. The detection
+arrives 1-9 s after the gap ends (the frames enter about 1 s after it starts);
+the larger values come from TCP's retry back-off after
+the link returns.
 
 LEO behaviour on top of OpenSAND: OpenSAND emulates one transparent satellite
 with a fixed delay. To reproduce the intermittent visibility of a LEO
