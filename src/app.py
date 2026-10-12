@@ -648,4 +648,7 @@ if __name__ == "__main__":
         app,
         host=os.getenv("APP_HOST", "0.0.0.0"),
         port=int(os.getenv("APP_PORT", os.getenv("PORT", "80"))),
+        # Keep idle client connections open long enough for a producer that
+        # reuses one connection across a satellite link (uvicorn default: 5 s).
+        timeout_keep_alive=int(os.getenv("APP_KEEPALIVE_S", "30")),
     )

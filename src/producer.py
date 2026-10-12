@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import heapq
+import http.client
 import json
 import os
 import statistics
@@ -40,6 +41,7 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -55,15 +57,72 @@ def _log(msg: str) -> None:
     print(f"PRODUCER {msg}", flush=True)
 
 
-def _post(url: str, body: bytes, timeout: float) -> tuple[int, dict]:
-    req = urllib.request.Request(url, data=body, method="POST")
-    req.add_header("Content-Type", "application/json")
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        raw = resp.read()
+# One TCP connection per edge, reused for every message. At a satellite round
+# trip of ~0.5 s, opening a connection per message costs a handshake plus TCP
+# slow start each time - more than the bandwidth itself (worked trace, M9:
+# 101.8 kB of crops took 2.7 s on a 2.6 Mbit/s link). PERSISTENT=0 restores the
+# connection-per-message behaviour, for comparison.
+_conns: dict[tuple[str, int], http.client.HTTPConnection] = {}
+_conn_lock = threading.Lock()
+CONNECTS = {"count": 0}
+
+
+def _persistent() -> bool:
+    return os.getenv("PERSISTENT", "1").strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _decode(status: int, raw: bytes) -> tuple[int, dict]:
+    try:
+        return status, json.loads(raw.decode("utf-8"))
+    except ValueError:
+        return status, {}
+
+
+def _close_conn(key: tuple[str, int]) -> None:
+    conn = _conns.pop(key, None)
+    if conn is not None:
         try:
-            return resp.status, json.loads(raw.decode("utf-8"))
-        except ValueError:
-            return resp.status, {}
+            conn.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _post(url: str, body: bytes, timeout: float) -> tuple[int, dict]:
+    """POST a JSON body. Raises OSError / HTTPException when the link is down."""
+    if not _persistent():
+        req = urllib.request.Request(url, data=body, method="POST")
+        req.add_header("Content-Type", "application/json")
+        CONNECTS["count"] += 1
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return _decode(resp.status, resp.read())
+
+    parts = urllib.parse.urlsplit(url)
+    key = (parts.hostname or "localhost", parts.port or 80)
+    path = parts.path or "/"
+    with _conn_lock:
+        # Two tries: a reused connection may have been closed by the server
+        # while idle (keep-alive timeout); that is not a link failure, so the
+        # message is resent at once on a fresh connection.
+        for attempt in (1, 2):
+            conn = _conns.get(key)
+            fresh = conn is None
+            if fresh:
+                conn = http.client.HTTPConnection(key[0], key[1], timeout=timeout)
+                _conns[key] = conn
+                CONNECTS["count"] += 1
+            try:
+                conn.request("POST", path, body=body, headers={"Content-Type": "application/json"})
+                resp = conn.getresponse()
+                return _decode(resp.status, resp.read())
+            except (http.client.RemoteDisconnected, http.client.CannotSendRequest,
+                    BrokenPipeError, ConnectionResetError):
+                _close_conn(key)
+                if fresh or attempt == 2:
+                    raise
+            except Exception:
+                _close_conn(key)
+                raise
+    raise ConnectionError("unreachable")
 
 
 def _pct(values: list[float], q: float) -> float | None:
@@ -156,7 +215,7 @@ class Producer:
             t_start = time.time()
             try:
                 status, resp = _post(self.edge + KINDS[prio][1], item["_body"], self.timeout)
-            except (urllib.error.URLError, OSError, TimeoutError) as exc:
+            except (urllib.error.URLError, OSError, TimeoutError, http.client.HTTPException) as exc:
                 if link_up is not False:
                     self.link_events.append({"t": time.time(), "event": "down", "error": type(exc).__name__})
                     _log(f"link down ({type(exc).__name__}); holding {len(self.queue) + 1} items")
@@ -234,6 +293,8 @@ class Producer:
                 "classified_mean": round(statistics.mean(cls_lat), 3) if cls_lat else None,
             },
             "link_events": self.link_events,
+            "tcp_connections": CONNECTS["count"],
+            "persistent": _persistent(),
             "delivery_order": delivered_order,
             "items": [{k: v for k, v in i.items() if k != "_body"} for i in self.items],
         }
