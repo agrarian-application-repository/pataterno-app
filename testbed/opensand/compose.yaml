@@ -1,0 +1,84 @@
+# PATATERNO local satellite testbed - NCSRD Testbed 1 topology in containers.
+#
+#   ws_st 192.168.2.2 --lan_st-- st 192.168.2.1 | 192.168.18.15 --emu-- sat 192.168.18.1
+#   ws_gw 192.168.1.2 --lan_gw-- gw 192.168.1.1 | 192.168.18.42 --emu--/
+#
+# The five nodes start with no satellite-side networking. up.sh then wires
+# the three segments with plain veth pairs (emu through a bridge in its own
+# network namespace, the two LANs point to point) - the equivalent of the
+# VirtualBox host-only networks vboxnet0/1/2 - and runs the CNES Makefiles.
+# Docker bridge networks are deliberately NOT used for these segments: the
+# Docker isolation rules would drop the routed ws_st <-> ws_gw traffic.
+#
+# Bring up with ./up.sh (not "docker compose up" alone).
+
+name: pataterno-testbed
+
+x-node: &node
+  image: pataterno/opensand-node:8.2.0
+  build: .
+  privileged: true          # TAP devices, bridges, sysctls - like the VMs in the guide
+  init: true
+  restart: "no"
+  command: ["sleep", "infinity"]
+
+services:
+  sat:
+    <<: *node
+    container_name: os-sat
+    hostname: sat
+    network_mode: none
+
+  gw:
+    <<: *node
+    container_name: os-gw
+    hostname: gw
+    network_mode: none
+
+  st:
+    <<: *node
+    container_name: os-st
+    hostname: st
+    network_mode: none
+
+  # Workstation behind the satellite gateway = the edge application server.
+  # It also has an ordinary Docker bridge for Internet egress (weather API,
+  # image pulls) and publishes the app port to the host.
+  ws_gw:
+    <<: *node
+    container_name: os-ws-gw
+    hostname: ws-gw
+    networks: [egress]
+    ports:
+      - "18080:8080"          # pataterno-app (ROLE=edge) dashboard/API -> http://localhost:18080
+
+  # Workstation behind the satellite terminal = the farm side (data producer).
+  ws_st:
+    <<: *node
+    container_name: os-ws-st
+    hostname: ws-st
+    networks: [egress]
+
+  # --- PATATERNO application containers (wired by the main track) ----------
+  # They share the network namespace of a workstation, so they see exactly
+  # its interfaces and routes and need no NET_ADMIN of their own.
+  # Outside this compose project use: docker run --network container:os-ws-gw ...
+  #
+  # edge:
+  #   image: ghcr.io/agrarian-application-repository/pataterno-app:latest
+  #   network_mode: "service:ws_gw"     # listens on 192.168.1.2:8080 (host: 18080)
+  #   environment:
+  #     ROLE: edge
+  #   depends_on: [ws_gw]
+  #
+  # producer:
+  #   image: ghcr.io/agrarian-application-repository/pataterno-app:latest
+  #   network_mode: "service:ws_st"     # sends to http://192.168.1.2:8080 across the satellite
+  #   environment:
+  #     ROLE: producer
+  #     EDGE_URL: http://192.168.1.2:8080
+  #   depends_on: [ws_st]
+
+networks:
+  egress:
+    driver: bridge

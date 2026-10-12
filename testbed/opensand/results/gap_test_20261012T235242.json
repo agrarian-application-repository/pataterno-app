@@ -1,0 +1,10 @@
+{
+  "connect_s": 28.86,
+  "total_s": 31.56,
+  "ok": true,
+  "gap_s": 30.0,
+  "upload_started_s_into_gap": 2.0,
+  "bytes": 150000,
+  "wait_for_pass_s": 28.0,
+  "after_pass_start_s": 3.56
+}

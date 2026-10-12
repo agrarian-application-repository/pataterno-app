@@ -1,0 +1,841 @@
+{
+  "edge": "http://192.168.1.2:8080",
+  "started": 1791842451.9778523,
+  "duration_s": 49.32,
+  "frames": [
+    {
+      "frame": "dorifera_spotted.png#0",
+      "meta": {
+        "flight_id": "PTZ-2026-06-17",
+        "captured_at": "2026-06-17T16:35:27Z",
+        "lat": 40.33044,
+        "lon": 15.60815,
+        "rel_alt_m": 2.0
+      },
+      "t_gateway_in": 1791842451.9782574,
+      "gateway_prep_ms": 103.3,
+      "candidates": 3,
+      "kpi6": {
+        "raw_bytes": 5438496,
+        "naive_jpeg_bytes": 376315,
+        "p0_summary": 244,
+        "p1_crops": 39982,
+        "p2_preview": 57582,
+        "sent_essential_bytes": 40226,
+        "sent_total_bytes": 97808,
+        "reduction_vs_raw_essential": 0.9926,
+        "reduction_vs_raw_total": 0.982,
+        "reduction_vs_jpeg_total": 0.7401
+      },
+      "latency_s": {
+        "alert_at_edge": 41.439,
+        "classified_at_edge": 43.049,
+        "verdict_back_at_gateway": 43.086,
+        "preview_delivered": 46.09
+      },
+      "edge": {
+        "crops": 3,
+        "classify_ms": 67.5,
+        "t_classified": 1791842495.026773,
+        "db_written": 0,
+        "detections": 2
+      },
+      "attempts": {
+        "p0_summary": 4,
+        "p1_crops": 1,
+        "p2_preview": 1
+      }
+    },
+    {
+      "frame": "dorifera_spotted_2.png#0",
+      "meta": {
+        "flight_id": "PTZ-2026-06-17",
+        "captured_at": "2026-06-17T16:36:01Z",
+        "lat": 40.33044,
+        "lon": 15.60819,
+        "rel_alt_m": 1.3
+      },
+      "t_gateway_in": 1791842457.116608,
+      "gateway_prep_ms": 87.5,
+      "candidates": 5,
+      "kpi6": {
+        "raw_bytes": 6179047,
+        "naive_jpeg_bytes": 560578,
+        "p0_summary": 263,
+        "p1_crops": 101833,
+        "p2_preview": 76543,
+        "sent_essential_bytes": 102096,
+        "sent_total_bytes": 178639,
+        "reduction_vs_raw_essential": 0.9835,
+        "reduction_vs_raw_total": 0.9711,
+        "reduction_vs_jpeg_total": 0.6813
+      },
+      "latency_s": {
+        "alert_at_edge": 36.461,
+        "classified_at_edge": 38.446,
+        "verdict_back_at_gateway": 38.48,
+        "preview_delivered": 41.343
+      },
+      "edge": {
+        "crops": 5,
+        "classify_ms": 55.4,
+        "t_classified": 1791842495.562927,
+        "db_written": 0,
+        "detections": 2
+      },
+      "attempts": {
+        "p0_summary": 1,
+        "p1_crops": 1,
+        "p2_preview": 1
+      }
+    },
+    {
+      "frame": "field_.png#0",
+      "meta": {
+        "flight_id": "PTZ-2026-06-17",
+        "captured_at": "2026-06-17T16:28:18Z",
+        "lat": 40.33029,
+        "lon": 15.60795,
+        "rel_alt_m": 11.1
+      },
+      "t_gateway_in": 1791842462.2424767,
+      "gateway_prep_ms": 96.6,
+      "candidates": 0,
+      "kpi6": {
+        "raw_bytes": 6735325,
+        "naive_jpeg_bytes": 1064125,
+        "p0_summary": 204,
+        "p1_crops": 0,
+        "p2_preview": 95769,
+        "sent_essential_bytes": 204,
+        "sent_total_bytes": 95973,
+        "reduction_vs_raw_essential": 1.0,
+        "reduction_vs_raw_total": 0.9858,
+        "reduction_vs_jpeg_total": 0.9098
+      },
+      "latency_s": {
+        "alert_at_edge": 31.496,
+        "classified_at_edge": 33.476,
+        "verdict_back_at_gateway": 33.514,
+        "preview_delivered": 36.668
+      },
+      "edge": {
+        "crops": 0,
+        "classify_ms": 0.0,
+        "t_classified": 1791842495.718503,
+        "db_written": 0,
+        "detections": 0
+      },
+      "attempts": {
+        "p0_summary": 1,
+        "p1_crops": 1,
+        "p2_preview": 1
+      }
+    },
+    {
+      "frame": "dorifera_spotted.png#1",
+      "meta": {
+        "flight_id": "PTZ-2026-06-17",
+        "captured_at": "2026-06-17T16:35:27Z",
+        "lat": 40.33044,
+        "lon": 15.60815,
+        "rel_alt_m": 2.0
+      },
+      "t_gateway_in": 1791842467.3815572,
+      "gateway_prep_ms": 89.7,
+      "candidates": 3,
+      "kpi6": {
+        "raw_bytes": 5438496,
+        "naive_jpeg_bytes": 376315,
+        "p0_summary": 244,
+        "p1_crops": 39982,
+        "p2_preview": 57582,
+        "sent_essential_bytes": 40226,
+        "sent_total_bytes": 97808,
+        "reduction_vs_raw_essential": 0.9926,
+        "reduction_vs_raw_total": 0.982,
+        "reduction_vs_jpeg_total": 0.7401
+      },
+      "latency_s": {
+        "alert_at_edge": 26.517,
+        "classified_at_edge": 28.648,
+        "verdict_back_at_gateway": 28.687,
+        "preview_delivered": 31.882
+      },
+      "edge": {
+        "crops": 3,
+        "classify_ms": 16.8,
+        "t_classified": 1791842496.0295076,
+        "db_written": 0,
+        "detections": 2
+      },
+      "attempts": {
+        "p0_summary": 1,
+        "p1_crops": 1,
+        "p2_preview": 1
+      }
+    },
+    {
+      "frame": "dorifera_spotted_2.png#1",
+      "meta": {
+        "flight_id": "PTZ-2026-06-17",
+        "captured_at": "2026-06-17T16:36:01Z",
+        "lat": 40.33044,
+        "lon": 15.60819,
+        "rel_alt_m": 1.3
+      },
+      "t_gateway_in": 1791842472.5086353,
+      "gateway_prep_ms": 86.6,
+      "candidates": 5,
+      "kpi6": {
+        "raw_bytes": 6179047,
+        "naive_jpeg_bytes": 560578,
+        "p0_summary": 264,
+        "p1_crops": 101834,
+        "p2_preview": 76544,
+        "sent_essential_bytes": 102098,
+        "sent_total_bytes": 178642,
+        "reduction_vs_raw_essential": 0.9835,
+        "reduction_vs_raw_total": 0.9711,
+        "reduction_vs_jpeg_total": 0.6813
+      },
+      "latency_s": {
+        "alert_at_edge": 21.551,
+        "classified_at_edge": 24.03,
+        "verdict_back_at_gateway": 24.072,
+        "preview_delivered": 27.146
+      },
+      "edge": {
+        "crops": 5,
+        "classify_ms": 22.5,
+        "t_classified": 1791842496.5387902,
+        "db_written": 0,
+        "detections": 2
+      },
+      "attempts": {
+        "p0_summary": 1,
+        "p1_crops": 1,
+        "p2_preview": 1
+      }
+    },
+    {
+      "frame": "field_.png#1",
+      "meta": {
+        "flight_id": "PTZ-2026-06-17",
+        "captured_at": "2026-06-17T16:28:18Z",
+        "lat": 40.33029,
+        "lon": 15.60795,
+        "rel_alt_m": 11.1
+      },
+      "t_gateway_in": 1791842477.629011,
+      "gateway_prep_ms": 97.8,
+      "candidates": 0,
+      "kpi6": {
+        "raw_bytes": 6735325,
+        "naive_jpeg_bytes": 1064125,
+        "p0_summary": 203,
+        "p1_crops": 0,
+        "p2_preview": 95768,
+        "sent_essential_bytes": 203,
+        "sent_total_bytes": 95971,
+        "reduction_vs_raw_essential": 1.0,
+        "reduction_vs_raw_total": 0.9858,
+        "reduction_vs_jpeg_total": 0.9098
+      },
+      "latency_s": {
+        "alert_at_edge": 16.591,
+        "classified_at_edge": 19.071,
+        "verdict_back_at_gateway": 19.113,
+        "preview_delivered": 22.478
+      },
+      "edge": {
+        "crops": 0,
+        "classify_ms": 0.0,
+        "t_classified": 1791842496.7000213,
+        "db_written": 0,
+        "detections": 0
+      },
+      "attempts": {
+        "p0_summary": 1,
+        "p1_crops": 1,
+        "p2_preview": 1
+      }
+    },
+    {
+      "frame": "dorifera_spotted.png#2",
+      "meta": {
+        "flight_id": "PTZ-2026-06-17",
+        "captured_at": "2026-06-17T16:35:27Z",
+        "lat": 40.33044,
+        "lon": 15.60815,
+        "rel_alt_m": 2.0
+      },
+      "t_gateway_in": 1791842482.7718687,
+      "gateway_prep_ms": 81.8,
+      "candidates": 3,
+      "kpi6": {
+        "raw_bytes": 5438496,
+        "naive_jpeg_bytes": 376315,
+        "p0_summary": 244,
+        "p1_crops": 39982,
+        "p2_preview": 57582,
+        "sent_essential_bytes": 40226,
+        "sent_total_bytes": 97808,
+        "reduction_vs_raw_essential": 0.9926,
+        "reduction_vs_raw_total": 0.982,
+        "reduction_vs_jpeg_total": 0.7401
+      },
+      "latency_s": {
+        "alert_at_edge": 11.599,
+        "classified_at_edge": 14.238,
+        "verdict_back_at_gateway": 14.271,
+        "preview_delivered": 17.686
+      },
+      "edge": {
+        "crops": 3,
+        "classify_ms": 15.0,
+        "t_classified": 1791842497.009487,
+        "db_written": 0,
+        "detections": 2
+      },
+      "attempts": {
+        "p0_summary": 1,
+        "p1_crops": 1,
+        "p2_preview": 1
+      }
+    },
+    {
+      "frame": "dorifera_spotted_2.png#2",
+      "meta": {
+        "flight_id": "PTZ-2026-06-17",
+        "captured_at": "2026-06-17T16:36:01Z",
+        "lat": 40.33044,
+        "lon": 15.60819,
+        "rel_alt_m": 1.3
+      },
+      "t_gateway_in": 1791842487.8857586,
+      "gateway_prep_ms": 95.6,
+      "candidates": 5,
+      "kpi6": {
+        "raw_bytes": 6179047,
+        "naive_jpeg_bytes": 560578,
+        "p0_summary": 264,
+        "p1_crops": 101834,
+        "p2_preview": 76544,
+        "sent_essential_bytes": 102098,
+        "sent_total_bytes": 178642,
+        "reduction_vs_raw_essential": 0.9835,
+        "reduction_vs_raw_total": 0.9711,
+        "reduction_vs_jpeg_total": 0.6813
+      },
+      "latency_s": {
+        "alert_at_edge": 6.646,
+        "classified_at_edge": 9.632,
+        "verdict_back_at_gateway": 9.67,
+        "preview_delivered": 12.964
+      },
+      "edge": {
+        "crops": 5,
+        "classify_ms": 19.3,
+        "t_classified": 1791842497.5178041,
+        "db_written": 0,
+        "detections": 2
+      },
+      "attempts": {
+        "p0_summary": 1,
+        "p1_crops": 1,
+        "p2_preview": 1
+      }
+    },
+    {
+      "frame": "field_.png#2",
+      "meta": {
+        "flight_id": "PTZ-2026-06-17",
+        "captured_at": "2026-06-17T16:28:18Z",
+        "lat": 40.33029,
+        "lon": 15.60795,
+        "rel_alt_m": 11.1
+      },
+      "t_gateway_in": 1791842493.0211232,
+      "gateway_prep_ms": 86.5,
+      "candidates": 0,
+      "kpi6": {
+        "raw_bytes": 6735325,
+        "naive_jpeg_bytes": 1064125,
+        "p0_summary": 204,
+        "p1_crops": 0,
+        "p2_preview": 95769,
+        "sent_essential_bytes": 204,
+        "sent_total_bytes": 95973,
+        "reduction_vs_raw_essential": 1.0,
+        "reduction_vs_raw_total": 0.9858,
+        "reduction_vs_jpeg_total": 0.9098
+      },
+      "latency_s": {
+        "alert_at_edge": 1.671,
+        "classified_at_edge": 4.662,
+        "verdict_back_at_gateway": 4.704,
+        "preview_delivered": 8.281
+      },
+      "edge": {
+        "crops": 0,
+        "classify_ms": 0.0,
+        "t_classified": 1791842497.6831844,
+        "db_written": 0,
+        "detections": 0
+      },
+      "attempts": {
+        "p0_summary": 1,
+        "p1_crops": 1,
+        "p2_preview": 1
+      }
+    }
+  ],
+  "totals": {
+    "frames": 9,
+    "raw_bytes": 55058604,
+    "naive_jpeg_bytes": 6003054,
+    "essential_bytes": 427581,
+    "sent_bytes_delivered": 1117809,
+    "reduction_vs_raw_essential": 0.9922,
+    "reduction_vs_raw_delivered": 0.9797,
+    "reduction_vs_jpeg_delivered": 0.8138,
+    "unsent_items": 0
+  },
+  "latency_s": {
+    "alert_p50": 21.551,
+    "alert_max": 41.439,
+    "classified_p50": 24.03,
+    "classified_max": 43.049,
+    "classified_mean": 23.917
+  },
+  "link_events": [
+    {
+      "t": 1791842462.1241374,
+      "event": "down",
+      "error": "URLError"
+    },
+    {
+      "t": 1791842493.4171808,
+      "event": "up"
+    }
+  ],
+  "delivery_order": [
+    "p0_summary:dorifera_spotted.png#0",
+    "p0_summary:dorifera_spotted_2.png#0",
+    "p0_summary:field_.png#0",
+    "p0_summary:dorifera_spotted.png#1",
+    "p0_summary:dorifera_spotted_2.png#1",
+    "p0_summary:field_.png#1",
+    "p0_summary:dorifera_spotted.png#2",
+    "p0_summary:dorifera_spotted_2.png#2",
+    "p0_summary:field_.png#2",
+    "p1_crops:dorifera_spotted.png#0",
+    "p1_crops:dorifera_spotted_2.png#0",
+    "p1_crops:field_.png#0",
+    "p1_crops:dorifera_spotted.png#1",
+    "p1_crops:dorifera_spotted_2.png#1",
+    "p1_crops:field_.png#1",
+    "p1_crops:dorifera_spotted.png#2",
+    "p1_crops:dorifera_spotted_2.png#2",
+    "p1_crops:field_.png#2",
+    "p2_preview:dorifera_spotted.png#0",
+    "p2_preview:dorifera_spotted_2.png#0",
+    "p2_preview:field_.png#0",
+    "p2_preview:dorifera_spotted.png#1",
+    "p2_preview:dorifera_spotted_2.png#1",
+    "p2_preview:field_.png#1",
+    "p2_preview:dorifera_spotted.png#2",
+    "p2_preview:dorifera_spotted_2.png#2",
+    "p2_preview:field_.png#2"
+  ],
+  "items": [
+    {
+      "frame": "dorifera_spotted.png#0",
+      "priority": 0,
+      "kind": "p0_summary",
+      "bytes": 244,
+      "t_enqueued": 1791842452.1113453,
+      "attempts": 4,
+      "t_first_try": 1791842452.1115618,
+      "t_send_start": 1791842488.1514056,
+      "t_ack": 1791842493.4172282,
+      "http": 202
+    },
+    {
+      "frame": "dorifera_spotted_2.png#0",
+      "priority": 0,
+      "kind": "p0_summary",
+      "bytes": 263,
+      "t_enqueued": 1791842457.2370903,
+      "attempts": 1,
+      "t_first_try": 1791842493.4172409,
+      "t_send_start": 1791842493.4172416,
+      "t_ack": 1791842493.5775247,
+      "http": 202
+    },
+    {
+      "frame": "field_.png#0",
+      "priority": 0,
+      "kind": "p0_summary",
+      "bytes": 204,
+      "t_enqueued": 1791842462.3763223,
+      "attempts": 1,
+      "t_first_try": 1791842493.5775378,
+      "t_send_start": 1791842493.577538,
+      "t_ack": 1791842493.7382221,
+      "http": 202
+    },
+    {
+      "frame": "dorifera_spotted.png#1",
+      "priority": 0,
+      "kind": "p0_summary",
+      "bytes": 244,
+      "t_enqueued": 1791842467.5033903,
+      "attempts": 1,
+      "t_first_try": 1791842493.7382355,
+      "t_send_start": 1791842493.7382357,
+      "t_ack": 1791842493.8987274,
+      "http": 202
+    },
+    {
+      "frame": "dorifera_spotted_2.png#1",
+      "priority": 0,
+      "kind": "p0_summary",
+      "bytes": 264,
+      "t_enqueued": 1791842472.6264038,
+      "attempts": 1,
+      "t_first_try": 1791842493.8987405,
+      "t_send_start": 1791842493.8987408,
+      "t_ack": 1791842494.0599046,
+      "http": 202
+    },
+    {
+      "frame": "field_.png#1",
+      "priority": 0,
+      "kind": "p0_summary",
+      "bytes": 203,
+      "t_enqueued": 1791842477.766587,
+      "attempts": 1,
+      "t_first_try": 1791842494.059919,
+      "t_send_start": 1791842494.0599194,
+      "t_ack": 1791842494.220282,
+      "http": 202
+    },
+    {
+      "frame": "dorifera_spotted.png#2",
+      "priority": 0,
+      "kind": "p0_summary",
+      "bytes": 244,
+      "t_enqueued": 1791842482.880528,
+      "attempts": 1,
+      "t_first_try": 1791842494.2202954,
+      "t_send_start": 1791842494.220296,
+      "t_ack": 1791842494.371334,
+      "http": 202
+    },
+    {
+      "frame": "dorifera_spotted_2.png#2",
+      "priority": 0,
+      "kind": "p0_summary",
+      "bytes": 264,
+      "t_enqueued": 1791842488.015775,
+      "attempts": 1,
+      "t_first_try": 1791842494.3713481,
+      "t_send_start": 1791842494.3713486,
+      "t_ack": 1791842494.5316963,
+      "http": 202
+    },
+    {
+      "frame": "field_.png#2",
+      "priority": 0,
+      "kind": "p0_summary",
+      "bytes": 204,
+      "t_enqueued": 1791842493.1450589,
+      "attempts": 1,
+      "t_first_try": 1791842494.531709,
+      "t_send_start": 1791842494.5317094,
+      "t_ack": 1791842494.6923347,
+      "http": 202
+    },
+    {
+      "frame": "dorifera_spotted.png#0",
+      "priority": 1,
+      "kind": "p1_crops",
+      "bytes": 39982,
+      "t_enqueued": 1791842452.111416,
+      "attempts": 1,
+      "t_first_try": 1791842494.6923473,
+      "t_send_start": 1791842494.6923478,
+      "t_ack": 1791842495.06472,
+      "http": 200,
+      "edge": {
+        "crops": 3,
+        "classify_ms": 67.5,
+        "t_classified": 1791842495.026773,
+        "db_written": 0,
+        "detections": 2
+      }
+    },
+    {
+      "frame": "dorifera_spotted_2.png#0",
+      "priority": 1,
+      "kind": "p1_crops",
+      "bytes": 101833,
+      "t_enqueued": 1791842457.2372358,
+      "attempts": 1,
+      "t_first_try": 1791842495.0647364,
+      "t_send_start": 1791842495.0647368,
+      "t_ack": 1791842495.5963318,
+      "http": 200,
+      "edge": {
+        "crops": 5,
+        "classify_ms": 55.4,
+        "t_classified": 1791842495.562927,
+        "db_written": 0,
+        "detections": 2
+      }
+    },
+    {
+      "frame": "field_.png#0",
+      "priority": 1,
+      "kind": "p1_crops",
+      "bytes": 182,
+      "t_enqueued": 1791842462.3763337,
+      "attempts": 1,
+      "t_first_try": 1791842495.5963495,
+      "t_send_start": 1791842495.59635,
+      "t_ack": 1791842495.7563715,
+      "http": 200,
+      "edge": {
+        "crops": 0,
+        "classify_ms": 0.0,
+        "t_classified": 1791842495.718503,
+        "db_written": 0,
+        "detections": 0
+      }
+    },
+    {
+      "frame": "dorifera_spotted.png#1",
+      "priority": 1,
+      "kind": "p1_crops",
+      "bytes": 39982,
+      "t_enqueued": 1791842467.503471,
+      "attempts": 1,
+      "t_first_try": 1791842495.7563872,
+      "t_send_start": 1791842495.7563875,
+      "t_ack": 1791842496.0689623,
+      "http": 200,
+      "edge": {
+        "crops": 3,
+        "classify_ms": 16.8,
+        "t_classified": 1791842496.0295076,
+        "db_written": 0,
+        "detections": 2
+      }
+    },
+    {
+      "frame": "dorifera_spotted_2.png#1",
+      "priority": 1,
+      "kind": "p1_crops",
+      "bytes": 101834,
+      "t_enqueued": 1791842472.6265566,
+      "attempts": 1,
+      "t_first_try": 1791842496.0689778,
+      "t_send_start": 1791842496.068978,
+      "t_ack": 1791842496.5802941,
+      "http": 200,
+      "edge": {
+        "crops": 5,
+        "classify_ms": 22.5,
+        "t_classified": 1791842496.5387902,
+        "db_written": 0,
+        "detections": 2
+      }
+    },
+    {
+      "frame": "field_.png#1",
+      "priority": 1,
+      "kind": "p1_crops",
+      "bytes": 181,
+      "t_enqueued": 1791842477.766599,
+      "attempts": 1,
+      "t_first_try": 1791842496.5803099,
+      "t_send_start": 1791842496.58031,
+      "t_ack": 1791842496.7424946,
+      "http": 200,
+      "edge": {
+        "crops": 0,
+        "classify_ms": 0.0,
+        "t_classified": 1791842496.7000213,
+        "db_written": 0,
+        "detections": 0
+      }
+    },
+    {
+      "frame": "dorifera_spotted.png#2",
+      "priority": 1,
+      "kind": "p1_crops",
+      "bytes": 39982,
+      "t_enqueued": 1791842482.8805947,
+      "attempts": 1,
+      "t_first_try": 1791842496.7425106,
+      "t_send_start": 1791842496.742511,
+      "t_ack": 1791842497.0428505,
+      "http": 200,
+      "edge": {
+        "crops": 3,
+        "classify_ms": 15.0,
+        "t_classified": 1791842497.009487,
+        "db_written": 0,
+        "detections": 2
+      }
+    },
+    {
+      "frame": "dorifera_spotted_2.png#2",
+      "priority": 1,
+      "kind": "p1_crops",
+      "bytes": 101834,
+      "t_enqueued": 1791842488.0159245,
+      "attempts": 1,
+      "t_first_try": 1791842497.042867,
+      "t_send_start": 1791842497.0428674,
+      "t_ack": 1791842497.5553958,
+      "http": 200,
+      "edge": {
+        "crops": 5,
+        "classify_ms": 19.3,
+        "t_classified": 1791842497.5178041,
+        "db_written": 0,
+        "detections": 2
+      }
+    },
+    {
+      "frame": "field_.png#2",
+      "priority": 1,
+      "kind": "p1_crops",
+      "bytes": 182,
+      "t_enqueued": 1791842493.1450713,
+      "attempts": 1,
+      "t_first_try": 1791842497.5554113,
+      "t_send_start": 1791842497.555412,
+      "t_ack": 1791842497.7253191,
+      "http": 200,
+      "edge": {
+        "crops": 0,
+        "classify_ms": 0.0,
+        "t_classified": 1791842497.6831844,
+        "db_written": 0,
+        "detections": 0
+      }
+    },
+    {
+      "frame": "dorifera_spotted.png#0",
+      "priority": 2,
+      "kind": "p2_preview",
+      "bytes": 57582,
+      "t_enqueued": 1791842452.1114974,
+      "attempts": 1,
+      "t_first_try": 1791842497.7253351,
+      "t_send_start": 1791842497.7253354,
+      "t_ack": 1791842498.0680368,
+      "http": 202
+    },
+    {
+      "frame": "dorifera_spotted_2.png#0",
+      "priority": 2,
+      "kind": "p2_preview",
+      "bytes": 76543,
+      "t_enqueued": 1791842457.2373915,
+      "attempts": 1,
+      "t_first_try": 1791842498.0680501,
+      "t_send_start": 1791842498.0680504,
+      "t_ack": 1791842498.4595797,
+      "http": 202
+    },
+    {
+      "frame": "field_.png#0",
+      "priority": 2,
+      "kind": "p2_preview",
+      "bytes": 95769,
+      "t_enqueued": 1791842462.3764613,
+      "attempts": 1,
+      "t_first_try": 1791842498.459592,
+      "t_send_start": 1791842498.4595923,
+      "t_ack": 1791842498.9109344,
+      "http": 202
+    },
+    {
+      "frame": "dorifera_spotted.png#1",
+      "priority": 2,
+      "kind": "p2_preview",
+      "bytes": 57582,
+      "t_enqueued": 1791842467.5035522,
+      "attempts": 1,
+      "t_first_try": 1791842498.9109514,
+      "t_send_start": 1791842498.9109519,
+      "t_ack": 1791842499.2633555,
+      "http": 202
+    },
+    {
+      "frame": "dorifera_spotted_2.png#1",
+      "priority": 2,
+      "kind": "p2_preview",
+      "bytes": 76544,
+      "t_enqueued": 1791842472.626661,
+      "attempts": 1,
+      "t_first_try": 1791842499.2633686,
+      "t_send_start": 1791842499.2633693,
+      "t_ack": 1791842499.654253,
+      "http": 202
+    },
+    {
+      "frame": "field_.png#1",
+      "priority": 2,
+      "kind": "p2_preview",
+      "bytes": 95768,
+      "t_enqueued": 1791842477.76678,
+      "attempts": 1,
+      "t_first_try": 1791842499.6542666,
+      "t_send_start": 1791842499.6542673,
+      "t_ack": 1791842500.1067924,
+      "http": 202
+    },
+    {
+      "frame": "dorifera_spotted.png#2",
+      "priority": 2,
+      "kind": "p2_preview",
+      "bytes": 57582,
+      "t_enqueued": 1791842482.8806741,
+      "attempts": 1,
+      "t_first_try": 1791842500.1068091,
+      "t_send_start": 1791842500.1068096,
+      "t_ack": 1791842500.4577696,
+      "http": 202
+    },
+    {
+      "frame": "dorifera_spotted_2.png#2",
+      "priority": 2,
+      "kind": "p2_preview",
+      "bytes": 76544,
+      "t_enqueued": 1791842488.0160296,
+      "attempts": 1,
+      "t_first_try": 1791842500.4577832,
+      "t_send_start": 1791842500.4577837,
+      "t_ack": 1791842500.8494844,
+      "http": 202
+    },
+    {
+      "frame": "field_.png#2",
+      "priority": 2,
+      "kind": "p2_preview",
+      "bytes": 95769,
+      "t_enqueued": 1791842493.1451986,
+      "attempts": 1,
+      "t_first_try": 1791842500.849497,
+      "t_send_start": 1791842500.8494976,
+      "t_ack": 1791842501.302074,
+      "http": 202
+    }
+  ]
+}

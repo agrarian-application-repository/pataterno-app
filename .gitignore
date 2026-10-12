@@ -12,7 +12,6 @@ venv/
 config/db.env
 
 # Local testbed: field frames are mounted, not committed (they go to Zenodo
-# with the dataset); measurement outputs are regenerated per run.
+# with the dataset). Measurement results are committed as evidence.
 testbed/frames/*.png
 testbed/frames/*.jpg
-testbed/results/

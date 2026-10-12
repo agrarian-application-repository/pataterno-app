@@ -1,0 +1,27 @@
+# PATATERNO local OpenSAND testbed - verification 2026-10-12T23:42:25+02:00
+# delay per hop: 125 ms
+
+## 1. Round-trip time
+ping gw->st(192.168.63.15): 0% packet loss, rtt min/avg/max/mdev = 511.545/525.395/535.337/7.286 ms, pipe 2
+ping ws_st->ws_gw(192.168.1.2): 0% packet loss, rtt min/avg/max/mdev = 511.866/520.688/531.711/7.119 ms, pipe 2
+ping ws_gw->ws_st(192.168.2.2): 0% packet loss, rtt min/avg/max/mdev = 511.020/523.143/535.090/7.876 ms, pipe 2
+
+## 2. Path (must go through st 192.168.2.1 / gw 192.168.63.254 or 192.168.1.1)
+ws_st -> ws_gw:
+traceroute to 192.168.1.2 (192.168.1.2), 30 hops max, 60 byte packets
+ 1  192.168.2.1  0.042 ms
+ 2  192.168.63.254  532.304 ms
+ 3  192.168.1.2  532.279 ms
+ws_gw -> ws_st:
+traceroute to 192.168.2.2 (192.168.2.2), 30 hops max, 60 byte packets
+ 1  192.168.1.1  0.033 ms
+ 2  192.168.63.15  511.638 ms
+ 3  192.168.2.2  511.618 ms
+
+## 3. Throughput (iperf3 server on ws_gw, client on ws_st)
+TCP uplink   (ws_st->ws_gw, return link): 2.54 Mbit/s received, retransmits 2
+TCP downlink (ws_gw->ws_st, forward link): 4.89 Mbit/s received, retransmits 39
+UDP uplink   (offered 20M): 8.69 Mbit/s delivered, loss 56.5%, jitter 0.6 ms
+UDP downlink (offered 100M): 99.59 Mbit/s delivered, loss 0.4%, jitter 0.1 ms
+
+saved: results/verify_20261012T234225.txt and results/verify_latest.json

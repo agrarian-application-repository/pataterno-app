@@ -1,0 +1,45 @@
+{
+  "timestamp": "20261012T234706",
+  "ping": {
+    "gw->st(192.168.63.15)": {
+      "min_ms": 66.458,
+      "avg_ms": 78.501,
+      "max_ms": 93.595,
+      "loss_pct": 0.0
+    },
+    "ws_gw->ws_st(192.168.2.2)": {
+      "min_ms": 71.623,
+      "avg_ms": 83.36,
+      "max_ms": 94.419,
+      "loss_pct": 0.0
+    },
+    "ws_st->ws_gw(192.168.1.2)": {
+      "min_ms": 68.056,
+      "avg_ms": 80.991,
+      "max_ms": 87.338,
+      "loss_pct": 0.0
+    }
+  },
+  "iperf3": {
+    "tcp_up": {
+      "received_mbps": 2.85,
+      "retransmits": 2
+    },
+    "tcp_down": {
+      "received_mbps": 83.43,
+      "retransmits": 418
+    },
+    "udp_up": {
+      "offered_mbps": 20.0,
+      "delivered_mbps": 8.67,
+      "lost_pct": 56.65,
+      "jitter_ms": 0.53
+    },
+    "udp_down": {
+      "offered_mbps": 100.0,
+      "delivered_mbps": 99.56,
+      "lost_pct": 0.43,
+      "jitter_ms": 0.08
+    }
+  }
+}

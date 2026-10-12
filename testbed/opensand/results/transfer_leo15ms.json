@@ -1,0 +1,127 @@
+{
+  "host": "192.168.1.2",
+  "port": 5599,
+  "reps": 3,
+  "results": [
+    {
+      "bytes": 1000,
+      "median_total_s": 0.16,
+      "min_total_s": 0.159,
+      "max_total_s": 0.162,
+      "goodput_mbps_median": 0.05,
+      "samples": [
+        {
+          "connect_s": 0.08,
+          "total_s": 0.159,
+          "ok": true
+        },
+        {
+          "connect_s": 0.081,
+          "total_s": 0.162,
+          "ok": true
+        },
+        {
+          "connect_s": 0.08,
+          "total_s": 0.16,
+          "ok": true
+        }
+      ]
+    },
+    {
+      "bytes": 10000,
+      "median_total_s": 0.181,
+      "min_total_s": 0.181,
+      "max_total_s": 0.19,
+      "goodput_mbps_median": 0.442,
+      "samples": [
+        {
+          "connect_s": 0.08,
+          "total_s": 0.181,
+          "ok": true
+        },
+        {
+          "connect_s": 0.081,
+          "total_s": 0.19,
+          "ok": true
+        },
+        {
+          "connect_s": 0.081,
+          "total_s": 0.181,
+          "ok": true
+        }
+      ]
+    },
+    {
+      "bytes": 150000,
+      "median_total_s": 0.613,
+      "min_total_s": 0.612,
+      "max_total_s": 0.613,
+      "goodput_mbps_median": 1.958,
+      "samples": [
+        {
+          "connect_s": 0.08,
+          "total_s": 0.612,
+          "ok": true
+        },
+        {
+          "connect_s": 0.081,
+          "total_s": 0.613,
+          "ok": true
+        },
+        {
+          "connect_s": 0.081,
+          "total_s": 0.613,
+          "ok": true
+        }
+      ]
+    },
+    {
+      "bytes": 1000000,
+      "median_total_s": 2.971,
+      "min_total_s": 2.97,
+      "max_total_s": 2.973,
+      "goodput_mbps_median": 2.693,
+      "samples": [
+        {
+          "connect_s": 0.069,
+          "total_s": 2.971,
+          "ok": true
+        },
+        {
+          "connect_s": 0.079,
+          "total_s": 2.97,
+          "ok": true
+        },
+        {
+          "connect_s": 0.081,
+          "total_s": 2.973,
+          "ok": true
+        }
+      ]
+    },
+    {
+      "bytes": 5000000,
+      "median_total_s": 14.089,
+      "min_total_s": 14.085,
+      "max_total_s": 14.094,
+      "goodput_mbps_median": 2.839,
+      "samples": [
+        {
+          "connect_s": 0.075,
+          "total_s": 14.089,
+          "ok": true
+        },
+        {
+          "connect_s": 0.07,
+          "total_s": 14.085,
+          "ok": true
+        },
+        {
+          "connect_s": 0.08,
+          "total_s": 14.094,
+          "ok": true
+        }
+      ]
+    }
+  ]
+}
