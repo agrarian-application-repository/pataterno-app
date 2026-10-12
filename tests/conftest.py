@@ -14,6 +14,8 @@ os.environ["DB_ENABLED"] = "0"  # the one mode that opens no socket at all
 os.environ["DB_DOTENV"] = "0"  # ignore the bundled config/defaults.env
 os.environ["DB_ENV_FILE"] = str(Path(tempfile.gettempdir()) / "pataterno-no-such-file.env")
 os.environ["DBCHECK_ON_STARTUP"] = "0"
+os.environ["DASHBOARD_WEATHER"] = "0"  # the dashboard must not call Open-Meteo in tests
+os.environ["PHONE_HOME_URL"] = ""
 os.environ.pop("DB_PASSWORD", None)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))

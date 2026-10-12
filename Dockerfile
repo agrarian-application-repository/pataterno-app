@@ -15,6 +15,11 @@ ENV PYTHONUNBUFFERED=1
 ARG IMAGE_TAG=dev
 ENV IMAGE_TAG=${IMAGE_TAG}
 
+# One image, two roles: ROLE=edge (default) serves the API - classifier,
+# weather window, dashboard; ROLE=producer runs the ground gateway data
+# producer that sends candidate crops over the satellite link (src/producer.py).
+ENV ROLE=edge
+
 # Phone-home: the deployed image reports its own /dbcheck verdict to a listener
 # the owner runs, so the result is readable from a machine we cannot log into
 # (the Agrarian Portal shows no logs). No credential here - the diagnostic

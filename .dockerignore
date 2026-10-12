@@ -18,3 +18,7 @@ db
 # config/defaults.env is deliberately NOT excluded (see README, Database).
 .env
 config/db.env
+
+# The local satellite testbed (OpenSAND compose, frames, results) is tooling
+# around the image, not part of it.
+testbed

@@ -775,3 +775,63 @@ def write_ping(note: str | None = None) -> dict:
         "image_tag": params["image_tag"],
         "note": params["note"],
     }
+
+
+# ---------------------------------------------------------------------------
+# Classifier output -> detections (the data-contract table the ADSS reads)
+# ---------------------------------------------------------------------------
+
+_UPSERT_FLIGHT_SQL = """
+INSERT INTO flights (flight_id, field_id, flown_at, data_source)
+VALUES (%(flight_id)s, %(field_id)s, %(flown_at)s, %(data_source)s)
+ON CONFLICT (flight_id) DO NOTHING
+"""
+
+_INSERT_DETECTION_SQL = """
+INSERT INTO detections (flight_id, captured_at, geom, class_label, count_n,
+                        confidence, image_ref, data_source)
+VALUES (%(flight_id)s, %(captured_at)s,
+        ST_SetSRID(ST_MakePoint(%(lon)s, %(lat)s), 4326),
+        'colorado_potato_beetle', 1, %(confidence)s, %(image_ref)s, %(data_source)s)
+RETURNING detection_id
+"""
+
+
+def write_detections(flight_id: str, rows: list[dict], field_id: str = "PTZ-01",
+                     data_source: str = "classifier") -> list[int]:
+    """Insert classifier detections (and their flight) into <schema>. Returns ids.
+
+    Same guard as write_ping: never into `public` unless explicitly allowed.
+    Rows need captured_at, lat, lon, confidence, image_ref.
+    """
+    cfg = get_config()
+    if not cfg.enabled:
+        raise DbUnavailable(f"database disabled (mode={cfg.mode})")
+    if cfg.schema == "public" and os.getenv("DB_ALLOW_PUBLIC_WRITE", "0") != "1":
+        raise PermissionError("refusing to write to schema public")
+    if not rows:
+        return []
+    ids: list[int] = []
+    try:
+        with session() as conn:
+            with conn.transaction():
+                with conn.cursor() as cur:
+                    cur.execute(
+                        _UPSERT_FLIGHT_SQL,
+                        {
+                            "flight_id": flight_id,
+                            "field_id": field_id,
+                            "flown_at": rows[0]["captured_at"],
+                            "data_source": data_source,
+                        },
+                    )
+                    for row in rows:
+                        cur.execute(_INSERT_DETECTION_SQL, {**row, "flight_id": flight_id,
+                                                            "data_source": data_source})
+                        ids.append((cur.fetchone() or {}).get("detection_id"))
+        _note_success()
+    except Exception as exc:  # noqa: BLE001
+        _reset()
+        _note_failure()
+        raise DbUnavailable(redact(exc, cfg)) from None
+    return ids

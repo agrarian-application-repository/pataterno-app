@@ -10,3 +10,9 @@ venv/
 # config/defaults.env IS committed on purpose - it carries the dev-schema
 # defaults that ship in the image.
 config/db.env
+
+# Local testbed: field frames are mounted, not committed (they go to Zenodo
+# with the dataset); measurement outputs are regenerated per run.
+testbed/frames/*.png
+testbed/frames/*.jpg
+testbed/results/

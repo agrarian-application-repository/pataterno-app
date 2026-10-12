@@ -59,6 +59,11 @@ I18N = {
         "advice_title": "Consiglio operativo",
         "window_label": "Finestra di trattamento:",
         "window_text": "domani 06:00–09:00 — vento previsto < 8 km/h, nessuna pioggia nelle 24 h successive.",
+        "wind_max": "vento max",
+        "dry_until": "asciutto fino a",
+        "no_window": "nessuna finestra utile nelle prossime 96 h",
+        "window_src": "previsione Open-Meteo 96 h, ricalcolata dal container",
+        "other_windows": "altre finestre:",
         "inspect_text": "Ispezionare la zona ST-03: umidità sotto soglia (31%). Verificare irrigazione settore nord-est.",
         "table_title": "Ultime letture per stazione (vista tabellare)",
         "th_station": "Stazione",
@@ -96,6 +101,11 @@ I18N = {
         "advice_title": "Operational advice",
         "window_label": "Treatment window:",
         "window_text": "tomorrow 06:00–09:00 — forecast wind < 8 km/h, no rain in the following 24 h.",
+        "wind_max": "max wind",
+        "dry_until": "dry until",
+        "no_window": "no usable window in the next 96 h",
+        "window_src": "Open-Meteo 96 h forecast, recomputed by the container",
+        "other_windows": "other windows:",
         "inspect_text": "Inspect area ST-03: moisture below threshold (31%). Check irrigation in the north-east sector.",
         "table_title": "Latest readings per station (table view)",
         "th_station": "Station",
@@ -207,6 +217,44 @@ def _moisture_chart_svg(series: list[dict] | None = None) -> str:
   <line id="xh" y1="{pad_t}" y2="{h - pad_b}" class="crosshair" visibility="hidden"/>
   {hits}
 </svg>"""
+
+
+def _dt(value) -> str:
+    """'2026-10-13T08:00' -> '13/10 08:00' (language-neutral)."""
+    text = str(value or "")
+    if len(text) >= 16 and text[10] == "T":
+        return html.escape(f"{text[8:10]}/{text[5:7]} {text[11:16]}")
+    return html.escape(text)
+
+
+def _window_html(window: dict | None) -> str:
+    """Advice-card body for the live weather window, or the mock text.
+
+    Static labels go through _t(); numbers and times stay outside any
+    data-i18n span so the language toggle cannot overwrite them.
+    """
+    if not window:
+        return f"<strong>{_t('window_label')}</strong> {_t('window_text')}"
+    best = window.get("best")
+    if not best:
+        body = _t("no_window")
+    else:
+        body = (
+            f"{_dt(best['start'])}–{_dt(best['spray_until'])[-5:]} · "
+            f"{_t('wind_max')} {_fmt(best.get('max_wind_kmh'))} km/h · "
+            f"{_t('dry_until')} {_dt(best['dry_until'])}"
+        )
+        others = (window.get("windows") or [])[1:3]
+        if others:
+            body += (
+                f'<div class="det-meta">{_t("other_windows")} '
+                + ", ".join(_dt(w["start"]) for w in others)
+                + "</div>"
+            )
+    return (
+        f"<strong>{_t('window_label')}</strong> {body}"
+        f'<div class="det-meta">{_t("window_src")}</div>'
+    )
 
 
 def _rows_from_readings(readings: list[dict]) -> list[dict]:
@@ -446,7 +494,7 @@ def render_dashboard(
       </div>
       <div class="card advice">
         <h2>{_t('advice_title')}</h2>
-        <p><strong>{_t('window_label')}</strong> {_t('window_text')}</p>
+        <p>{_window_html(meta.get('window'))}</p>
         <p class="det-meta" style="margin-top:6px">{_t('inspect_text')}</p>
       </div>
     </div>

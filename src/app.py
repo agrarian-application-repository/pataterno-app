@@ -5,16 +5,20 @@ pataterno-app - AGRARIAN Project (Open Call 2, Testbed 2)
 Demo application for the PATATERNO project (Precision Agriculture for
 poTAto pesT Early Recognition with NOn-terrestrial communications).
 
-It exposes a minimal version of the PATATERNO container API described in
-the WP4 architecture: soil-reading ingestion, latest-values query and a
-Colorado-potato-beetle (CPB) detection summary. Readings and detections are
-still kept in memory; `/dbcheck` reports whether the AGRARIAN PostgreSQL is
-reachable from wherever this container runs.
+It is the PATATERNO edge application of the WP4 architecture: soil-reading
+ingestion and queries, the INT8 Colorado-potato-beetle (CPB) classifier behind
+/images (whole frames, or the candidate crops a ground gateway sends over the
+satellite link), the weather-window job, the farmer dashboard, and `/dbcheck`
+for whether the AGRARIAN PostgreSQL is reachable from wherever it runs.
+
+The same image also runs the ground side: ROLE=producer starts the gateway
+data producer (src/producer.py) instead of the API.
 
 Developed by Buontech Solutions srl.
 """
 
 import asyncio
+import io
 import json
 import os
 import time
@@ -23,17 +27,21 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from PIL import Image
 from pydantic import BaseModel, Field
 
+import classifier
 import dashboard as dashboard_mod
 import db
 import dbconfig
+import vision
+import weather
 from dashboard import render_dashboard
 
 APP_NAME = "pataterno-app"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 
 async def _startup_dbcheck() -> None:
@@ -134,6 +142,9 @@ async def _keepalive_loop() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     tasks = []
+    # Compile the INT8 model in the background, so the first frame does not
+    # pay for it and /health is never delayed.
+    tasks.append(asyncio.get_running_loop().create_task(asyncio.to_thread(classifier.available)))
     if os.getenv("DBCHECK_ON_STARTUP", "1") != "0":
         loop = asyncio.get_running_loop()
         tasks.append(loop.create_task(_startup_dbcheck()))
@@ -306,19 +317,33 @@ def detections(min_confidence: float = 0.0):
         raise HTTPException(status_code=422, detail="min_confidence must be in [0, 1]")
 
     def _memory() -> list[dict]:
-        return [d for d in DETECTIONS if d["confidence"] >= min_confidence]
+        return [d for d in _memory_detections() if d["confidence"] >= min_confidence]
 
     rows, source = _db_first(lambda: db.fetch_detections(min_confidence), _memory)
     return {"count": len(rows), "detections": rows, **_provenance(source, rows)}
 
 
+def _weather_for_dashboard() -> dict | None:
+    """The live treatment window, or None (the card then shows its mock text).
+
+    Opt-out with DASHBOARD_WEATHER=0, e.g. in tests: it is a network call.
+    """
+    if os.getenv("DASHBOARD_WEATHER", "1") == "0":
+        return None
+    doc = weather.get_window()
+    return doc if doc.get("available") else None
+
+
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard():
     """Read-only farmer dashboard — real data when available, mock otherwise."""
+    window = _weather_for_dashboard()
     bundle = db.dashboard_bundle() if db.db_available() else None
     if bundle is None:
-        # All-or-nothing: a half-real page cannot be captioned honestly.
-        return render_dashboard(DETECTIONS)
+        # All-or-nothing for the field data: a half-real page cannot be
+        # captioned honestly. Classifier detections made by this container are
+        # real outputs, so they replace the mock list when there are any.
+        return render_dashboard(_memory_detections(), meta={"window": window})
     return render_dashboard(
         bundle["detections"],
         stations=dashboard_mod._rows_from_readings(bundle["readings"]),
@@ -328,8 +353,236 @@ def dashboard():
             "synthetic": bundle["synthetic"],
             "as_of": bundle["as_of"],
             "expected_stations": len(bundle["stations"]) or 9,
+            "window": window,
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Images: the INT8 classifier at the edge
+#
+# Two ways in. POST /images takes a whole frame and does everything here (the
+# portal / single-node case). The /images/summary, /images/package and
+# /images/preview trio is what a ground gateway sends over the satellite link
+# after reducing the frame itself (src/vision.py) - P0, P1 and P2 of its
+# priority queue. KPI-2 timing fields ride along so the producer can measure
+# capture-to-alert latency on one clock.
+# ---------------------------------------------------------------------------
+
+CLASSIFIED: list[dict] = []   # detections produced by the classifier
+ALERTS: list[dict] = []       # one per frame: candidate summary, then verdict
+_MAX_KEEP = 500
+
+
+def _memory_detections() -> list[dict]:
+    return list(reversed(CLASSIFIED)) if CLASSIFIED else DETECTIONS
+
+
+def _keep(store: list, item: dict) -> None:
+    store.append(item)
+    del store[:-_MAX_KEEP]
+
+
+def _alert_for(frame: str) -> dict | None:
+    for alert in reversed(ALERTS):
+        if alert["frame"] == frame:
+            return alert
+    return None
+
+
+def _cpb_threshold() -> float:
+    try:
+        return float(os.getenv("CPB_THRESHOLD", "0.5"))
+    except ValueError:
+        return 0.5
+
+
+def _classify_and_record(frame: str, crops, boxes, meta: dict, t_received: float) -> dict:
+    """Classify crops, record detections + the frame alert. Runs in a thread."""
+    if not crops:
+        verdicts, ms = [], 0.0
+    else:
+        verdicts, ms = classifier.timed_classify(crops)
+    threshold = _cpb_threshold()
+    now_iso = db.utc_now_z()
+    captured_at = meta.get("captured_at") or now_iso
+    hits = []
+    for box, verdict in zip(boxes, verdicts):
+        if verdict["p_cpb"] >= threshold:
+            hits.append(
+                {
+                    "frame": frame,
+                    "label": "colorado_potato_beetle",
+                    "confidence": verdict["p_cpb"],
+                    "box": list(box),
+                    "lat": meta.get("lat"),
+                    "lon": meta.get("lon"),
+                    "captured_at": captured_at,
+                }
+            )
+    for hit in hits:
+        _keep(CLASSIFIED, hit)
+
+    written: int | str = 0
+    if hits and meta.get("lat") is not None and db.db_available():
+        try:
+            ids = db.write_detections(
+                meta.get("flight_id") or f"edge-{captured_at[:10]}",
+                [{**h, "image_ref": f"{frame}#{','.join(map(str, h['box']))}"} for h in hits],
+                data_source=os.getenv("DETECTIONS_DATA_SOURCE", "classifier"),
+            )
+            written = len(ids)
+        except Exception as exc:  # noqa: BLE001 - memory still has them
+            written = f"not written: {dbconfig.redact(exc)}"
+
+    alert = _alert_for(frame)
+    if alert is None:
+        alert = {"frame": frame, **{k: meta.get(k) for k in ("flight_id", "captured_at", "lat", "lon", "t_gateway_in")}}
+        _keep(ALERTS, alert)
+    alert.update(
+        {
+            "state": "classified",
+            "crops": len(verdicts),
+            "cpb": len(hits),
+            "max_p_cpb": max((v["p_cpb"] for v in verdicts), default=None),
+            "classify_ms": round(ms, 1),
+            "t_package_received": t_received,
+            "t_classified": time.time(),
+            "db_written": written,
+        }
+    )
+    return {
+        "frame": frame,
+        "crops": len(verdicts),
+        "detections": hits,
+        "verdicts": [{"box": list(b), **v} for b, v in zip(boxes, verdicts)],
+        "classify_ms": round(ms, 1),
+        "threshold": threshold,
+        "db_written": written,
+        "t_classified": alert["t_classified"],
+    }
+
+
+class FrameMeta(BaseModel):
+    frame: str = Field(..., max_length=200)
+    flight_id: Optional[str] = Field(None, max_length=80)
+    captured_at: Optional[str] = None
+    lat: Optional[float] = Field(None, ge=-90, le=90)
+    lon: Optional[float] = Field(None, ge=-180, le=180)
+    t_gateway_in: Optional[float] = None
+
+
+class SummaryIn(FrameMeta):
+    n_candidates: int = Field(..., ge=0)
+    candidates: list[list[float]] = Field(default_factory=list)
+
+
+class CropIn(BaseModel):
+    box: list[int] = Field(..., min_length=4, max_length=4)
+    jpeg_b64: str
+
+
+class PackageIn(FrameMeta):
+    crops: list[CropIn] = Field(default_factory=list, max_length=64)
+
+
+class PreviewIn(FrameMeta):
+    jpeg_b64: str
+
+
+@app.get("/model")
+def model_info():
+    """The shipped classifier: artefact, size, reference accuracy, runtime."""
+    return {**classifier.info(), "roi": vision.config_dict(vision.RoiConfig.from_env()),
+            "threshold": _cpb_threshold()}
+
+
+@app.post("/images")
+async def images(request: Request, frame: str = "upload", lat: Optional[float] = None,
+                 lon: Optional[float] = None, captured_at: Optional[str] = None,
+                 flight_id: Optional[str] = None):
+    """Whole frame in (raw image bytes as the body), detections out.
+
+    The container does the gateway's reduction itself here, and reports the
+    KPI-6 figures for the frame alongside the verdicts.
+    """
+    body = await request.body()
+    if not body:
+        raise HTTPException(status_code=422, detail="send the image bytes as the request body")
+    t_received = time.time()
+    meta = {"lat": lat, "lon": lon, "captured_at": captured_at, "flight_id": flight_id,
+            "t_gateway_in": t_received}
+
+    def work() -> dict:
+        try:
+            package = vision.build_package(body, frame, meta, vision.RoiConfig.from_env())
+        except Exception as exc:  # noqa: BLE001 - PIL's errors are the client's fault
+            raise HTTPException(status_code=422, detail=f"not a readable image: {type(exc).__name__}") from None
+        crops = [Image.open(io.BytesIO(c)).convert("RGB") for c in package.crops]
+        result = _classify_and_record(frame, crops, package.boxes, meta, t_received)
+        return {**result, "kpi6": package.kpi6(), "candidates": len(package.candidates)}
+
+    if not classifier.available():
+        return JSONResponse(status_code=503, content={"error": "classifier unavailable", "model": classifier.info()})
+    return await asyncio.to_thread(work)
+
+
+@app.post("/images/summary", status_code=202)
+def images_summary(body: SummaryIn):
+    """P0: a sub-kilobyte alert that candidates exist - before any crop arrives."""
+    alert = _alert_for(body.frame)
+    if alert is None:
+        alert = {"frame": body.frame}
+        _keep(ALERTS, alert)
+    alert.update(
+        {
+            **body.model_dump(exclude={"candidates"}),
+            "state": alert.get("state", "candidates"),
+            "t_summary_received": time.time(),
+        }
+    )
+    return {"accepted": True, "frame": body.frame, "t_received": alert["t_summary_received"]}
+
+
+@app.post("/images/package")
+def images_package(body: PackageIn):
+    """P1: the candidate crops. Classified here; detections recorded."""
+    if not classifier.available():
+        return JSONResponse(status_code=503, content={"error": "classifier unavailable"})
+    t_received = time.time()
+    try:
+        crops = [vision.decode_crop(c.jpeg_b64) for c in body.crops]
+    except Exception:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail="a crop is not a readable JPEG") from None
+    meta = body.model_dump(exclude={"crops"})
+    return _classify_and_record(body.frame, crops, [tuple(c.box) for c in body.crops], meta, t_received)
+
+
+@app.post("/images/preview", status_code=202)
+def images_preview(body: PreviewIn):
+    """P2: low-resolution frame preview for the map. Stored as size + time only."""
+    alert = _alert_for(body.frame)
+    if alert is not None:
+        alert["preview_bytes"] = len(body.jpeg_b64) * 3 // 4
+        alert["t_preview_received"] = time.time()
+    return {"accepted": True, "frame": body.frame}
+
+
+@app.get("/alerts")
+def alerts(limit: int = 50):
+    """Per-frame alerts with their timing fields (KPI-2 instrumentation)."""
+    limit = max(1, min(limit, _MAX_KEEP))
+    return {"count": len(ALERTS), "alerts": list(reversed(ALERTS[-limit:]))}
+
+
+@app.get("/weather/window")
+def weather_window(lat: Optional[float] = None, lon: Optional[float] = None, refresh: bool = False,
+                   hourly: bool = False):
+    """Rain-free treatment windows over the next 96 h (Open-Meteo forecast)."""
+    doc = weather.get_window(lat, lon, refresh=refresh)
+    if not hourly:
+        doc = {k: v for k, v in doc.items() if k != "hourly"}
+    return doc
 
 
 # ---------------------------------------------------------------------------
@@ -380,6 +633,13 @@ def dbcheck_write(body: Optional[PingNote] = None):
 
 
 if __name__ == "__main__":
+    if os.getenv("ROLE", "edge").strip().lower() == "producer":
+        # Same image, ground side: the gateway data producer (Testbed 2's
+        # "data producer server" feeding the emulated IoT node).
+        import producer
+
+        raise SystemExit(producer.main())
+
     import uvicorn
 
     # Port 80 by default so the Dockerfile and its HEALTHCHECK keep working;

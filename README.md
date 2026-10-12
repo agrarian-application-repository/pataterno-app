@@ -26,6 +26,13 @@ This demo exercises the full AGRARIAN application pipeline described in the Deve
 | GET | `/stations` | Station inventory with GeoJSON geometry (`?kind=soil_station` drops gateways) |
 | GET | `/dbcheck` | Is the AGRARIAN database reachable from here, and if not, why not (see Database) |
 | POST | `/dbcheck/write` | Write one marker row into `<schema>.container_pings` |
+| GET | `/model` | The shipped INT8 classifier: artefact, size, reference accuracy, runtime, ROI settings |
+| POST | `/images?frame=&lat=&lon=` | Whole drone frame as the request body -> candidate regions -> INT8 classifier -> detections, with the frame's KPI-6 byte figures |
+| POST | `/images/summary` | P0 from a ground gateway: sub-kilobyte "candidates at these positions" alert |
+| POST | `/images/package` | P1: the candidate crops (JPEG, base64) -> classified here -> detections |
+| POST | `/images/preview` | P2: low-resolution frame preview (sent only when the link has room) |
+| GET | `/alerts` | Per-frame alerts with their timing fields (KPI-2 instrumentation) |
+| GET | `/weather/window` | Rain-free treatment windows over the next 96 h (Open-Meteo forecast for the field) |
 
 `/readings/latest`, `/detections`, `/stations` and `/dashboard` read from the
 database when it is reachable and fall back to the built-in demo data
@@ -38,6 +45,36 @@ otherwise. Every JSON response says which happened:
 `synthetic` is true whenever the rows come from the `dev` sandbox, and the
 dashboard shows a matching amber badge — so neither an API consumer nor a
 screenshot can mistake sandbox data for field data.
+
+## Image pipeline and the two roles (v1.2)
+
+One image runs both ends of the satellite link:
+
+- `ROLE=edge` (default) - the API above. The classifier is the KPI-7 artefact:
+  EfficientNet-B0, OpenVINO NNCF INT8, `models/cpb_int8/` (6.12 MB weights).
+  `tools/eval_model.py <dir>` re-measures it with the container's own
+  preprocessing; on the 448-image held-out set it gives 96.21% (211/223 CPB,
+  220/225 not-CPB), identical to the KPI-7 report.
+- `ROLE=producer` - the ground gateway data producer (`src/producer.py`). For
+  each frame in `FRAMES_DIR` it keeps only candidate regions (saturated
+  orange-brown specks with leaf around them, `src/vision.py`), queues P0
+  summary / P1 crops / P2 preview, and sends them to `EDGE_URL` highest
+  priority first, holding them while the link is down. It writes per-frame
+  KPI-6 bytes and KPI-2 timings to `RESULTS_PATH`.
+
+```bash
+docker run -d --name edge -p 8080:80 -e DB_ENABLED=0 ghcr.io/agrarian-application-repository/pataterno-app:latest
+docker run --rm -e ROLE=producer -e EDGE_URL=http://<edge-host>:8080   -e FRAMES_DIR=/frames -e RESULTS_PATH=/frames/results.json -v $PWD/frames:/frames   ghcr.io/agrarian-application-repository/pataterno-app:latest
+```
+
+Known limit: the classifier was trained on close-up images. On random 224 px
+crops of drone frames it flags 18-42% as CPB (bare soil, mixed backgrounds),
+which is why the ground-side candidate filter is required in front of it; the
+fine-tuning on the season's annotated field crops is the next model step.
+
+`testbed/` holds the local satellite testbed (OpenSAND, the emulator NCSRD
+documents for the Open Call testbeds) used to run both roles across an
+emulated satellite link; see `testbed/opensand/README.md`.
 
 ## Run locally
 
