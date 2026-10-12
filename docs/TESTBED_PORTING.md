@@ -13,7 +13,7 @@ One Docker image, `ghcr.io/agrarian-application-repository/pataterno-app`
 | Role | Started with | What it does | Talks to |
 |---|---|---|---|
 | **edge** (default) | `docker run ... pataterno-app` | API on port 80: INT8 CPB classifier behind `/images`, weather window, dashboard, `/dbcheck` | receives from the producer; writes detections to `pataterno_db` when reachable; Open-Meteo over the internet for the forecast |
-| **producer** | `-e ROLE=producer` | ground gateway data producer: reduces each drone frame to candidate crops and sends P0 summary / P1 crops / P2 preview to the edge, highest priority first, holding them while the link is down | the edge, across the satellite link |
+| **producer** | `-e ROLE=producer` | farm-side data producer: reduces each drone frame to candidate crops and sends P0 summary / P1 crops / P2 preview to the edge, highest priority first, holding them while the link is down | the edge, across the satellite link |
 
 Footprint of the edge role, measured on our machine with the container
 limited to 1 CPU: 79 MiB RAM idle, 153 MiB after classifying ten 1080p
@@ -53,13 +53,16 @@ and `testbed/results/`):
 | Round trip ws_st <-> ws_gw | 522 ms | 81 ms |
 | TCP farm -> edge (DVB-RCS2 return link) | 2.6 Mbit/s | 2.85 Mbit/s |
 | TCP edge -> farm (DVB-S2 forward link) | 4.2-10.8 Mbit/s | 83 Mbit/s |
-| 3 drone frames, continuous link: alert at the edge (p50) | 2.1 s | 0.33 s |
-| 3 drone frames, continuous link: classified at the edge (p50) | 7.4 s | 1.35 s |
-| 9 frames, link starting in a 40 s gap, 20 s passes: worst alert | 39.9 s | 41.4 s |
+| 3 drone frames, continuous link: detection at the edge (p50) | 7.4 s | 1.35 s |
+| 3 drone frames, continuous link: summary at the edge (p50) | 2.1 s | 0.33 s |
+| 9 frames, link starting in a 40 s gap, 20 s passes: worst detection | 77.0 s | 43.0 s |
+| 9 frames, link starting in a 40 s gap, 20 s passes: worst summary | 39.9 s | 41.4 s |
 | Bytes: raw frames -> IP bytes into the satellite terminal | 18.35 MB -> 395.4 kB (-97.85%) | same |
 
 With intermittent visibility every message was delivered (27 of 27), in
-priority order: all alerts, then all crops, then all previews.
+priority order: all summaries, then all crops, then all previews. KPI-2 counts
+the detection (the classified crops), not the summary; times start when the
+frame enters the producer, so the drone-to-producer time is not included.
 `testbed/run_scenarios.sh` reproduces both scenarios with the published image.
 
 LEO behaviour on top of OpenSAND: OpenSAND emulates one transparent satellite
@@ -95,9 +98,9 @@ devices over the emulated link". The mapping is therefore:
 
 | PATATERNO piece | Local testbed | Testbed 2 element |
 |---|---|---|
-| producer (`ROLE=producer`) | `ws_st` behind the terminal | the **data producer server** attached to an emulated IoT node |
+| producer (`ROLE=producer`) | `ws_st` behind the satellite terminal | the **data producer server** attached to an emulated IoT node |
 | satellite link | OpenSAND st - sat - gw + netem pass schedule | the emulated constellation (DLR's pass dynamics, inter-satellite links) |
-| edge (`ROLE=edge`) | `ws_gw` behind the gateway | the **on-board edge** of a satellite node (or the ground station, if on-board execution is modelled rather than executed) |
+| edge (`ROLE=edge`) | `ws_gw` behind the satellite gateway | the **on-board edge** of a satellite node (or the ground station, if on-board execution is modelled rather than executed) |
 | detections -> `pataterno_db` | memory / `dev` schema over the VPN | AGRARIAN Data Storage, from the ground station |
 
 Two cases, depending on how DLR's edge works:
@@ -145,7 +148,8 @@ Two cases, depending on how DLR's edge works:
 
 The producer's JSON report (`RESULTS_PATH`) has, per frame: the raw frame
 bytes, the bytes of each message as sent (KPI-6), and the times from the frame
-entering the gateway to the alert reaching the edge, to the crops being
-classified, and to the verdict being back at the gateway (KPI-2). All times
+entering the producer to the summary reaching the edge, to the crops being
+classified at the edge (the detection, which KPI-2 counts), and to the result
+being back at the producer. All times
 are taken on one clock (the producer's, plus the edge's classification
 timestamp when both run on hosts with synchronised clocks).

@@ -28,10 +28,10 @@ This demo exercises the full AGRARIAN application pipeline described in the Deve
 | POST | `/dbcheck/write` | Write one marker row into `<schema>.container_pings` |
 | GET | `/model` | The shipped INT8 classifier: artefact, size, reference accuracy, runtime, ROI settings |
 | POST | `/images?frame=&lat=&lon=` | Whole drone frame as the request body -> candidate regions -> INT8 classifier -> detections, with the frame's KPI-6 byte figures |
-| POST | `/images/summary` | P0 from a ground gateway: sub-kilobyte "candidates at these positions" alert |
+| POST | `/images/summary` | P0 from the producer: sub-kilobyte summary, "candidates at these positions" |
 | POST | `/images/package` | P1: the candidate crops (JPEG, base64) -> classified here -> detections |
 | POST | `/images/preview` | P2: low-resolution frame preview (sent only when the link has room) |
-| GET | `/alerts` | Per-frame alerts with their timing fields (KPI-2 instrumentation) |
+| GET | `/alerts` | One record per frame (summary, crops, detections) with its timing fields (KPI-2 instrumentation) |
 | GET | `/weather/window` | Rain-free treatment windows over the next 96 h (Open-Meteo forecast for the field) |
 
 `/readings/latest`, `/detections`, `/stations` and `/dashboard` read from the
@@ -55,7 +55,7 @@ One image runs both ends of the satellite link:
   `tools/eval_model.py <dir>` re-measures it with the container's own
   preprocessing; on the 448-image held-out set it gives 96.21% (211/223 CPB,
   220/225 not-CPB), identical to the KPI-7 report.
-- `ROLE=producer` - the ground gateway data producer (`src/producer.py`). For
+- `ROLE=producer` - the farm-side data producer (`src/producer.py`). For
   each frame in `FRAMES_DIR` it keeps only candidate regions (saturated
   orange-brown specks with leaf around them, `src/vision.py`), queues P0
   summary / P1 crops / P2 preview, and sends them to `EDGE_URL` highest

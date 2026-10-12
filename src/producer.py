@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Ground gateway data producer - the farm side of the satellite link.
+Farm-side data producer - the ground end of the satellite link.
 
 Testbed 2 (DLR) accepts real data "by integrating a dedicated data producer
 server, whose outputs are then forwarded by the IoT devices over the emulated
@@ -14,13 +14,16 @@ link". This is that producer. For each drone frame it:
   3. sends them to the edge application across the link, highest priority
      first, holding them (store-and-forward) while the link is down.
 
-So when a LEO pass is short or the link drops, all pending alerts go before
+So when a LEO pass is short or the link drops, all pending summaries go before
 any crop, and all crops before any preview - the WP4 "priority queuing for
 intermittent connectivity".
 
 It records, per frame, the KPI-6 bytes (raw frame vs what was sent) and the
-KPI-2 timings (frame in at the gateway -> alert / classified at the edge),
-on one clock, and writes them to a JSON file.
+KPI-2 timings (frame in at the producer -> summary received / crops
+classified at the edge), on one clock, and writes them to a JSON file. In the
+report, `alert_at_edge` is the time the P0 summary reached the edge and
+`classified_at_edge` the detection time, which is the one KPI-2 counts (key
+names kept so earlier result files stay comparable).
 
     ROLE=producer EDGE_URL=http://192.168.1.2:80 FRAMES_DIR=/frames python src/app.py
     python src/producer.py --frames DIR --edge URL [--manifest frames.json] [--out results.json]
