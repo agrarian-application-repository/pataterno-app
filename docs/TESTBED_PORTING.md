@@ -84,7 +84,7 @@ producer pointing at `http://192.168.1.2:80`.
 
 ```bash
 # Workstation Gateway (192.168.1.2)
-docker run -d --name pataterno-edge -p 80:80 -e PHONE_HOME_URL= \
+docker run -d --name pataterno-edge -p 80:5001 -e PHONE_HOME_URL= \
   ghcr.io/agrarian-application-repository/pataterno-app:latest
 
 # Workstation Terminal (192.168.2.2) - frames in ./frames, report in ./frames/results.json
@@ -120,6 +120,52 @@ Two cases, depending on how DLR's edge works:
   frame at the edge. The producer still runs as the data producer server, and
   its JSON report gives the delivery times over DLR's link.
 
+### Testbed 2 as set up by DLR (integration session, 19 October 2026)
+
+DLR runs the emulation on the VM `agrarian-pataterno` (host `dlr-edge-node2`,
+10.5.6.10 on the DLR VPN): a Mininet-style topology started by DLR's `main.py`,
+with links shaped per hop.
+
+| Node | Role | Addresses |
+|---|---|---|
+| `swc0` | entry switch | 10.0.10.1; reached from outside as **10.5.6.10:8000** |
+| `gwy0` | input satellite gateway | up 10.0.10.2, down 10.0.0.1 |
+| `sat0` | satellite with the edge | up 10.0.0.2, down 10.0.1.1, edge 10.0.20.1 |
+| `swc1` | edge host (Docker) | 10.0.20.2, listens on **8001**, published to the container's **5001** |
+| `sat1` | second satellite | up 10.0.1.2, down 10.0.2.1 |
+| `gwy1` | satellite gateway | up 10.0.2.2, down 10.0.30.1 |
+| `swc2` | exit switch to the Internet / data repository | 10.0.30.2 |
+
+The entry is an iptables DNAT on the VM (`-d 10.5.6.10 --dport 8000 -j DNAT
+--to-destination 10.0.10.2:8000`, plus MASQUERADE and FORWARD accepts); the
+edge container is started the way DLR starts the other projects' edge apps,
+`docker run -d -p 8001:5001 <image>`. Checked in the session: ping 10.5.6.10
+from the gateway, then a raw TCP client on the gateway (10.5.6.40) reached
+DLR's test server at 10.0.20.2:8001 through 10.5.6.10:8000.
+
+PATATERNO therefore runs on Testbed 2 as:
+
+```bash
+# edge host (DLR, or the Agrarian Portal with 8001 -> 5001)
+docker run -d --name pataterno-edge --restart unless-stopped -p 8001:5001 \
+  ghcr.io/agrarian-application-repository/pataterno-app:latest
+
+# soil gateway, DLR tunnel up (tb0 10.5.6.40 or tb1 10.5.6.41)
+testbed/dlr/check_dlr_link.sh            # ping, TCP, /health, /dbcheck from inside the container
+python3 src/producer.py --edge http://10.5.6.10:8000 --frames <dir>
+```
+
+The container listens on 5001 by default (`APP_PORT`). Its `/dbcheck`,
+called through the same path, reports whether the data repository is
+reachable from inside the container on the edge host. Rehearsed locally with
+the same `-p 8001:5001` mapping: all checks pass, including pataterno_db
+reachable from inside the container and one drone frame classified at the
+edge (2 detections).
+
+Note: `agrarian_p2_0` (10.5.6.40) and `agrarian_p2_1` (10.5.6.41) are the two
+DLR client identities; a machine must not use the same one as the gateway at
+the same time.
+
 ### What we need from DLR
 
 1. Access: a login for the entry VM (10.5.6.10), or the agreed way to start
@@ -137,7 +183,8 @@ Two cases, depending on how DLR's edge works:
 | Variable | Role | Default | Meaning |
 |---|---|---|---|
 | `ROLE` | both | `edge` | `edge` or `producer` |
-| `EDGE_URL` | producer | `http://192.168.1.2:80` | where the edge listens |
+| `EDGE_URL` | producer | `http://10.5.6.10:8000` | where the edge listens (default: the Testbed 2 entry) |
+| `APP_PORT` | edge | `5001` | container port (Testbed 2 publishes it as 8001) |
 | `FRAMES_DIR`, `FRAMES_MANIFEST` | producer | `/frames`, `<dir>/frames.json` | frames, and per-frame lat/lon/time/flight |
 | `FRAME_INTERVAL_S`, `REPEAT` | producer | `0`, `1` | capture cadence, replays |
 | `SEND_PREVIEW` | producer | `1` | send P2 previews |

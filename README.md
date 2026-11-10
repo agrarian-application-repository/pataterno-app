@@ -63,7 +63,7 @@ One image runs both ends of the satellite link:
   KPI-6 bytes and KPI-2 timings to `RESULTS_PATH`.
 
 ```bash
-docker run -d --name edge -p 8080:80 -e DB_ENABLED=0 ghcr.io/agrarian-application-repository/pataterno-app:latest
+docker run -d --name edge -p 8080:5001 -e DB_ENABLED=0 ghcr.io/agrarian-application-repository/pataterno-app:latest
 docker run --rm -e ROLE=producer -e EDGE_URL=http://<edge-host>:8080   -e FRAMES_DIR=/frames -e RESULTS_PATH=/frames/results.json -v $PWD/frames:/frames   ghcr.io/agrarian-application-repository/pataterno-app:latest
 ```
 
@@ -87,7 +87,7 @@ python -m pytest tests/ -v        # the suite never touches a real database
 ## Run the container
 
 ```bash
-docker run -p 8080:80 ghcr.io/<owner>/pataterno-app:latest
+docker run -p 8080:5001 ghcr.io/<owner>/pataterno-app:latest   # the app listens on 5001 (APP_PORT)
 curl http://localhost:8080/health
 ```
 

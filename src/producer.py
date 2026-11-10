@@ -25,7 +25,7 @@ report, `alert_at_edge` is the time the P0 summary reached the edge and
 `classified_at_edge` the detection time, which is the one KPI-2 counts (key
 names kept so earlier result files stay comparable).
 
-    ROLE=producer EDGE_URL=http://192.168.1.2:80 FRAMES_DIR=/frames python src/app.py
+    ROLE=producer EDGE_URL=http://10.5.6.10:8000 FRAMES_DIR=/frames python src/app.py
     python src/producer.py --frames DIR --edge URL [--manifest frames.json] [--out results.json]
 """
 
@@ -306,7 +306,7 @@ def _env_bool(name: str, default: bool) -> bool:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="PATATERNO ground gateway data producer")
-    ap.add_argument("--edge", default=os.getenv("EDGE_URL", "http://192.168.1.2:80"))
+    ap.add_argument("--edge", default=os.getenv("EDGE_URL", "http://10.5.6.10:8000"))
     ap.add_argument("--frames", default=os.getenv("FRAMES_DIR", "/frames"))
     ap.add_argument("--manifest", default=os.getenv("FRAMES_MANIFEST", ""))
     ap.add_argument("--interval", type=float, default=float(os.getenv("FRAME_INTERVAL_S", "0")))

@@ -138,7 +138,7 @@ jobs:
           echo "Starting container..."
           # DB_ENABLED=0: no AGRARIAN network from a GitHub runner, so the
           # connector must not spend its connect timeout on every request.
-          docker run -d --name test-app -p 8080:80 -e DB_ENABLED=0 "$IMAGE" || {
+          docker run -d --name test-app -p 8080:5001 -e DB_ENABLED=0 "$IMAGE" || {
             echo "❌ Failed to start container"
             exit 1
           }

@@ -48,12 +48,16 @@ RUN mkdir -p /app/config
 RUN adduser --system --group appuser
 USER appuser
 
-# Expose port
-EXPOSE 80
+# Port 5001: the container port of the AGRARIAN Testbed 2 (DLR) convention -
+# the edge host publishes it as 8001 (docker run -p 8001:5001), and the
+# testbed entry 10.5.6.10:8000 forwards across the emulated satellites to it.
+# Override with -e APP_PORT=... (the HEALTHCHECK follows it).
+ENV APP_PORT=5001
+EXPOSE 5001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl --fail http://localhost/health || exit 1
+    CMD curl --fail http://localhost:${APP_PORT}/health || exit 1
 
 # Run application
 CMD ["python", "src/app.py"]

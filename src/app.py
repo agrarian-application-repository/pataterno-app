@@ -642,12 +642,12 @@ if __name__ == "__main__":
 
     import uvicorn
 
-    # Port 80 by default so the Dockerfile and its HEALTHCHECK keep working;
-    # override locally, where binding 80 needs privileges.
+    # Port 5001 by default: the container port of the Testbed 2 (DLR) edge
+    # host, published there as 8001. The Dockerfile sets the same value.
     uvicorn.run(
         app,
         host=os.getenv("APP_HOST", "0.0.0.0"),
-        port=int(os.getenv("APP_PORT", os.getenv("PORT", "80"))),
+        port=int(os.getenv("APP_PORT", os.getenv("PORT", "5001"))),
         # Keep idle client connections open long enough for a producer that
         # reuses one connection across a satellite link (uvicorn default: 5 s).
         timeout_keep_alive=int(os.getenv("APP_KEEPALIVE_S", "30")),
